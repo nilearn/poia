@@ -34,7 +34,8 @@ def _(config, mo):
 
         Will list repo that:
 
-        - contain {config["PACKAGE_OF_INTEREST"]} in one the common files used to declare dependencies
+        - contain {config["PACKAGE_OF_INTEREST"]} in one the common files
+          used to declare dependencies
           (pyproject.toml, setup.cfg, requirements.txt...)
 
         - import {config["PACKAGE_OF_INTEREST"]} in a python module or a ipython notebook.
@@ -196,8 +197,9 @@ def _(data_projects, pd):
 def _(data_projects_df, mo):
     mo.md(
         f"""
-        Found {data_projects_df["duplicated_repo"].sum()}
-        repositories that seem to be duplicated.
+        Found {len(data_projects_df)}
+        repositories. {data_projects_df["duplicated_repo"].sum()}
+        of them seem to be duplicated.
         """
     )
 
@@ -235,103 +237,25 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""### Last commit date""")
+def _(config, data_projects_df, mo, px):
+    fig_content = px.histogram(
+        data_projects_df[data_projects_df["include"]],
+        x="content",
+        title=f"Content of {data_projects_df['include'].sum()} repositories",
+    )
 
+    fig_content.show()
 
-@app.cell(hide_code=True)
-def _(config, data_projects_df, mo, plot_repos):
-    fig = plot_repos(data_projects_df, color="content")
-    fig.show()
     mo.md(f"""
-    Let's see how recently those repos were last updated
-    split by what content uses {config["PACKAGE_OF_INTEREST"]}.
+    Content of repositories distinguishing those
+    using {config["PACKAGE_OF_INTEREST"]}
+    in notebooks, python files or both.
     """)
-    return (fig,)
+    return (fig_content,)
 
 
 @app.cell(hide_code=True)
-def _(config, data_projects_df, fig, mo, plot_repos):
-    plot_repos(data_projects_df, color="extracted_version")
-    fig.show()
-    mo.md(f"""
-    We can also do the same but
-    split by what pinned version of {config["PACKAGE_OF_INTEREST"]}
-    they use.
-
-    "0.0.0" is used here for cases when no version was pinned
-    or the exact version could not be determined.
-    """)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""### Version used""")
-
-
-@app.cell
-def _(data_projects_df, plot_versions):
-    plot_versions(data_projects_df)
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _(data_projects_df, extract_object_count):
-    import_df = extract_object_count(
-        data_projects_df[data_projects_df["has_imports"]], col="import_counts"
-    )
-    import_df
-    return (import_df,)
-
-
-@app.cell
-def _(import_df, plot_usage):
-    plot_usage(import_df, color="content")
-
-
-@app.cell
-def _(import_df, plot_usage):
-    plot_usage(import_df, color="extracted_version")
-
-
-@app.cell
-def _(data_projects_df, extract_object_count):
-    function_df = extract_object_count(
-        data_projects_df[data_projects_df["use_imports"]], col="function_counts"
-    )
-    function_df
-    return (function_df,)
-
-
-@app.cell
-def _(function_df, plot_usage):
-    plot_usage(function_df, color="content")
-
-
-@app.cell
-def _(function_df, plot_usage):
-    plot_usage(function_df, color="extracted_version")
-
-
-@app.cell(hide_code=True)
-def _(config, mo):
-    mo.md(
-        f"""
-        Now we have list of repos that import / use the {config["PACKAGE_OF_INTEREST"]}
-        and those that have it as a dependency.
-
-        Let's try to see how many projects have
-        the POI as dependency but do not import it.
-        """
-    )
-
-
-@app.cell(hide_code=True)
-def _(config, data_projects_df, plt, venn2):
+def _(config, data_projects_df, mo, plt, venn2):
     as_dependency = data_projects_df["name"][data_projects_df["has_version"]].to_list()
     actually_import = data_projects_df["name"][data_projects_df["has_imports"]].to_list()
     venn2(
@@ -345,29 +269,136 @@ def _(config, data_projects_df, plt, venn2):
         ),
     )
     plt.show()
+    mo.md(
+        f"""
+        Let's try to see how many repositories have
+        the {config["PACKAGE_OF_INTEREST"]} as dependency but do not import it.
+        """
+    )
     return actually_import, as_dependency
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""Or that import the POI bit do not use it.""")
+    mo.md(r"""### Last commit date""")
+
+
+@app.cell
+def _(mo):
+    options = ["content", "extracted_version"]
+    radio = mo.ui.radio(options=options)
+    return options, radio
+
+
+@app.cell
+def _(radio):
+    explanation = ""
+    if radio.value == "extracted_version":
+        explanation = """
+    Version "0.0.0" is used here for cases when no version was pinned
+    or the exact version could not be determined.
+    """
+    return (explanation,)
 
 
 @app.cell(hide_code=True)
-def _(actually_import, config, data_projects_df, plt, venn2):
-    use_import = data_projects_df["name"][data_projects_df["use_imports"]].to_list()
-    venn2(
-        subsets=(
-            set(actually_import),
-            set(use_import),
-        ),
-        set_labels=(
-            f"import {config['PACKAGE_OF_INTEREST']}",
-            f"use {config['PACKAGE_OF_INTEREST']}",
-        ),
+def _(config, data_projects_df, explanation, mo, plot_repos, radio):
+    fig_repo = plot_repos(data_projects_df, color=radio.value)
+    fig_repo.show()
+
+    mo.vstack(
+        [
+            mo.md(f"""
+    Let's see how recently those repos were last updated
+    split by what {radio.value} uses {config["PACKAGE_OF_INTEREST"]}.
+    {explanation}"""),
+            mo.hstack(
+                [
+                    mo.vstack([mo.md("color"), radio]),
+                ],
+                align="center",
+            ),
+        ]
     )
-    plt.show()
-    return (use_import,)
+    return (fig_repo,)
+
+
+@app.cell(hide_code=True)
+def _(data_projects_df, mo, plot_versions):
+    fig_version = plot_versions(data_projects_df)
+    fig_version.show()
+
+    mo.md("""
+    ### Version used
+    """)
+    return (fig_version,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""### Subpackage use""")
+
+
+@app.cell
+def _(data_projects_df, extract_object_count):
+    import_df = extract_object_count(
+        data_projects_df[data_projects_df["has_imports"]], col="import_counts"
+    )
+    import_df
+    return (import_df,)
+
+
+@app.cell(hide_code=True)
+def _(config, explanation, import_df, mo, plot_usage, radio):
+    subpackage_fig = plot_usage(import_df, color=radio.value)
+    subpackage_fig.show()
+
+    mo.vstack(
+        [
+            mo.md(f"""
+    Analysis of which subpackage of {config["PACKAGE_OF_INTEREST"]}
+    are used split by {radio.value}.
+    {explanation}
+    """),
+            mo.hstack(
+                [
+                    mo.vstack([mo.md("color"), radio]),
+                ],
+                align="center",
+            ),
+        ],
+    )
+    return (subpackage_fig,)
+
+
+@app.cell
+def _(data_projects_df, extract_object_count):
+    function_df = extract_object_count(
+        data_projects_df[data_projects_df["use_imports"]], col="function_counts"
+    )
+    function_df
+    return (function_df,)
+
+
+@app.cell
+def _(config, function_df, mo, plot_usage, radio):
+    function_fig = plot_usage(function_df, color=radio.value)
+    function_fig.show()
+    mo.vstack(
+        [
+            mo.md(f"""
+    Analysis of which class / functions of {config["PACKAGE_OF_INTEREST"]}
+    are used split by {radio.value}.
+    """),
+            mo.hstack(
+                [
+                    mo.vstack([mo.md("color"), radio]),
+                ],
+                align="center",
+            ),
+        ]
+    )
+    return (function_fig,)
 
 
 @app.cell(hide_code=True)
@@ -445,7 +476,7 @@ def _(Version, mcolors, plt, px):
 
         fig.update_layout(xaxis_title=col, yaxis_title="Usage Count")
 
-        fig.show()
+        return fig
 
     return (plot_usage,)
 
@@ -498,6 +529,7 @@ def _(Version, mcolors, plt, px):
 @app.cell
 def _(Version, px):
     def plot_versions(df):
+        df = df[df["include"]]
         df = df.drop_duplicates(subset=["name"])
 
         # Drop NaNs in extracted_version
@@ -510,7 +542,7 @@ def _(Version, px):
             df,
             x="extracted_version",
             category_orders={"extracted_version": ordered_versions},
-            title=f"Analysis of {len(df)} projects",
+            title=f"Analysis of {len(df)} repositories",
             color="content",
         )
         fig.update_layout(xaxis_title="Version", yaxis_title="Repository Count")
@@ -833,7 +865,7 @@ def _(
         )
 
         data_projects = load_cache(content_cache_file)
-        repo_already_done = set([x["name"] for x in data_projects])
+        repo_already_done = {x["name"] for x in data_projects}
 
         for user in config["CACHE"]["DIR"].iterdir():
             if not user.is_dir():
@@ -845,19 +877,19 @@ def _(
                     continue
 
                 repo_full_name = f"{user.name}/{d.name}"
-                logger.debug(f"Analyzing {repo_full_name}")
+                logger.info(f"{repo_full_name}")
 
                 if f"https://github.com/{repo_full_name}" in ignore_list:
-                    logger.info(f"Repo in ignore list: {repo_full_name}")
+                    logger.info("\tRepo in ignore list")
                     continue
                 if repo_full_name in repo_already_done:
-                    logger.info(f"Repo already analyzed: {repo_full_name}")
+                    logger.info("\tRepo already analyzed.")
                     continue
 
                 last_commit = get_last_commit_date(d)
 
                 if last_commit is None:
-                    logger.info(f"Could not get date last commit. Removing: {repo_full_name}")
+                    logger.info("\tCould not get date last commit. Deleting repo.")
                     shutil.rmtree(d)
                     continue
 
@@ -875,9 +907,7 @@ def _(
                             part in config["EXCLUDED_DIRS"]
                             for part in py_file.relative_to(config["CACHE"]["DIR"]).parts
                         ):
-                            logger.debug(
-                                f"File in exlcuded dir : {py_file.relative_to(config['CACHE']['DIR'])}"
-                            )
+                            logger.debug(f"File in excluded dir : {py_file.relative_to(d)}")
                             continue
 
                         try:
@@ -888,39 +918,30 @@ def _(
                                     notebook_node = nbformat.read(f, as_version=4)
                                     content, _ = exporter.from_notebook_node(notebook_node)
                         except UnicodeDecodeError:
-                            logger.error(
-                                f"Could not decode file: {py_file.relative_to(config['CACHE']['DIR'])}"
-                            )
+                            logger.error(f"\tCould not decode file: {py_file.relative_to(d)}")
                             continue
                         except NotJSONError:
                             logger.error(
-                                "Notebook does not appear to be JSON: "
-                                f"{py_file.relative_to(config['CACHE']['DIR'])}"
+                                f"\tNotebook does not appear to be JSON: {py_file.relative_to(d)}"
                             )
                             continue
                         except Exception:
-                            logger.error(
-                                f"Error when reading: {py_file.relative_to(config['CACHE']['DIR'])}"
-                            )
+                            logger.error(f"\tError when reading: {py_file.relative_to(d)}")
                             continue
 
                         if config["PACKAGE_OF_INTEREST"] not in content:
                             logger.debug(
-                                f"POI not in file: {py_file.relative_to(config['CACHE']['DIR'])}"
+                                f"\t{config['PACKAGE_OF_INTEREST']} not in file: "
+                                f"{py_file.relative_to(d)}"
                             )
                             continue
 
                         found_imports = count_imports(content, config)
                         if not found_imports:
-                            logger.debug(
-                                "no import of POI in file: "
-                                f"{py_file.relative_to(config['CACHE']['DIR'])}"
-                            )
+                            logger.debug(f"\tNo import of POI in file: {py_file.relative_to(d)}")
                             continue
                         if isinstance(found_imports, Exception):
-                            logger.error(
-                                f"Error parsing content: {py_file.relative_to(config['CACHE']['DIR'])}"
-                            )
+                            logger.error(f"\tError parsing content: {py_file.relative_to(d)}")
                             continue
 
                         for k, v in found_imports.items():
@@ -957,7 +978,7 @@ def _(
                 with content_cache_file.open("w") as f:
                     json.dump(data_projects, f, indent=2)
 
-                logger.info(f"Repo done: {repo_full_name}")
+                logger.info("\tDONE")
         logger.info("Data extraction done.")
 
     return (extract_data,)

@@ -1,3 +1,5 @@
+"""Marimo demo."""
+
 import marimo
 
 __generated_with = "0.12.4"
@@ -7,13 +9,11 @@ app = marimo.App(width="medium", app_title="Intro to Marimo notebooks")
 @app.cell
 def _(mo):
     mo.md(r"""# Marimo notebooks""")
-    return
 
 
 @app.cell
 def _(mo):
     mo.md(r"""## tab completion and type 'aware'""")
-    return
 
 
 app._unparsable_cell(
@@ -22,16 +22,17 @@ app._unparsable_cell(
 
     def foo(a: str):
         a.
-        retrun a
+        return a
 
     """,
-    name="_"
+    name="_",
 )
 
 
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 

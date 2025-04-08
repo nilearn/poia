@@ -2,6 +2,8 @@
 
 tmp
 
+__pycache__
+
 # Mac OS X
 .DS_Store
 

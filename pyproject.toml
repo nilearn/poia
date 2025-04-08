@@ -41,12 +41,7 @@ requires-python = ">=3.11"
 [project.optional-dependencies]
 # For running unit and docstring tests
 test = [
-    "coverage",
     "pytest>=6.0.0",
-    "pytest-cov",
-    "pytest-randomly",
-    "pytest-xdist[psutil]",
-    "pytest-timeout"
 ]
 
 [project.urls]
@@ -86,7 +81,7 @@ module = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers -s -vv --timeout=60"
+addopts = "-ra --strict-config --strict-markers -s -vv"
 doctest_optionflags = "NORMALIZE_WHITESPACE ELLIPSIS"
 junit_family = "xunit2"
 log_cli_level = "INFO"

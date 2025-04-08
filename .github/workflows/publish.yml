@@ -28,11 +28,10 @@ jobs:
                 with:
                     python-version: 3.12
 
-            -   name: Install dependencies
-                run: uv pip install .
-
-            -   name: 📄 Export notebook
-                run: marimo export html-wasm poia/poia.py -o _site --mode run
+            -   name: 📄  Install dependencies & export notebook
+                run: |
+                    uv sync
+                    marimo export html-wasm poia/poia.py -o _site --mode run
 
             -   name: 📦 Upload Pages Artifact
                 uses: actions/upload-pages-artifact@v3

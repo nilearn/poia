@@ -1,0 +1,32 @@
+.mypy_cache
+
+.tox
+
+tmp
+
+# Mac OS X
+.DS_Store
+
+# IDE related
+.idea/
+.vscode/
+
+# build related
+build
+dist/
+
+# notebooks
+.ipynb_checkpoints
+
+# virtual environment
+env/
+venv/
+
+# testing
+.pytest_cache
+
+# coverage
+.coverage
+coverage
+coverage.xml
+nosetests_coverage/

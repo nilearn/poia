@@ -1,0 +1,31 @@
+---
+# Configuration file for sourcery
+#
+# To run sourcery refactoring suggestions (may require authentification):
+#
+# pip install sourcery
+# sourcery review nilearn
+#
+# 📚 For a complete reference to this file, see the documentation at
+# https://docs.sourcery.ai/Configuration/Project-Settings/
+#
+
+version: '1'
+
+ignore: # A list of paths or files which Sourcery will ignore.
+-   nilearn/_version.py
+
+
+rule_settings:
+    enable:
+    -   default
+    disable:
+    -   no-loop-in-tests
+    -   no-conditionals-in-tests
+
+    rule_types:
+    -   refactoring
+    python_version: '3.11'
+
+metrics:
+    quality_threshold: 25.0

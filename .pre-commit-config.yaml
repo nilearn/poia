@@ -56,6 +56,6 @@ repos:
     rev: v1.15.0
     hooks:
     -   id: mypy
-        files: src
+        files: poia
         additional_dependencies: [types-tqdm, types-toml, types-requests, pandas-stubs]
         args: [--config-file, pyproject.toml, --pretty]

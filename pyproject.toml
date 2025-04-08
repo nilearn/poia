@@ -3,7 +3,7 @@ build-backend = "hatchling.build"
 requires = ["hatchling", "hatch-vcs"]
 
 [project]
-authors = [{name = "POIA developers"}]
+authors = [{ name = "POIA developers" }]
 classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved",
@@ -13,31 +13,32 @@ classifiers = [
     "Operating System :: POSIX",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13"
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "joblib>=1.2.0",
-    "lxml",
-    "nibabel>=5.2.0",
-    "numpy>=1.22.4",
-    "pandas>=2.2.0",
-    "requests>=2.25.0",
-    "scikit-learn>=1.4.0",
-    "scipy>=1.8.0",
-    "packaging"
+    "ipython==9.1.0",
+    "marimo",
+    "matplotlib==3.10.1",
+    "matplotlib-venn==1.1.2",
+    "nbconvert==7.16.6",
+    "nbformat==5.10.4",
+    "packaging==24.2",
+    "pandas==2.2.3",
+    "plotly==6.0.1",
+    "requests==2.32.3",
+    "rich==14.0.0",
+    "toml==0.10.2",
 ]
 description = "Package Of Interest Auditor"
 # Version from setuptools_scm
 dynamic = ["version"]
-license = {text = "new BSD"}
-maintainers = [{name = "Rémi Gau", email = "remi.gau@inria.fr"}]
-name = "nilearn"
-readme = "README.rst"
+license = { text = "new BSD" }
+maintainers = [{ name = "Rémi Gau", email = "remi.gau@inria.fr" }]
+name = "poia"
+readme = "README.md"
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
-# A combination of dependencies useful for developers
-dev = ["nilearn[test]"]
 # For running unit and docstring tests
 test = [
     "coverage",
@@ -45,21 +46,21 @@ test = [
     "pytest-cov",
     "pytest-randomly",
     "pytest-xdist[psutil]",
-    "pytest-timeout"
+    "pytest-timeout",
 ]
 
 [project.urls]
-Homepage = "https://nilearn.github.io"
+Homepage = "https://www.github.com/Remi-Gau/poia"
 
 [tool.codespell]
 builtin = "clear,rare,en-GB_to_en-US"
 skip = "./.git,*.cff,*/tmp,.mypy_cache,env,venv"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/poia/_version.py"
+version-file = "poia/_version.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/poia"]
+packages = ["poia"]
 
 [tool.hatch.version]
 source = "vcs"
@@ -67,7 +68,7 @@ source = "vcs"
 [tool.mypy]
 allow_redefinition = false
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-exclude = ['tests/test_.*', 'src/poia/_version.py']
+exclude = ['**/tests/test_.*', 'poia/_version.py']
 warn_unreachable = false
 
 [[tool.mypy.overrides]]
@@ -79,9 +80,8 @@ module = [
     "nbformat.*",
     "nbconvert.*",
     "packaging.*",
-    "loguru.*",
     "matplotlib_venn.*",
-    "marimo.*"
+    "marimo.*",
 ]
 
 [tool.pytest.ini_options]
@@ -93,7 +93,7 @@ minversion = "6.0"
 xfail_strict = true
 
 [tool.ruff]
-include = ["pyproject.toml", "src/**/*.py"]
+include = ["pyproject.toml", "poia"]
 indent-width = 4
 line-length = 100
 
@@ -109,24 +109,6 @@ skip-magic-trailing-comma = false
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 fixable = ["ALL"]
 ignore = [
-    "ARG005",
-    "B904",
-    "D105",
-    "D205",
-    "D208",
-    "D301",
-    "E741",
-    "ERA001",
-    "FURB105",
-    "N802",
-    "N803",
-    "N806",
-    "PD901",
-    "PERF203",
-    "PIE790",
-    "PLR2004",
-    "PTH207",
-    "UP038",
     # https://github.com/astral-sh/ruff/issues/7871
     # Avoid linter rules conflicting with the formatter
     # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
@@ -141,7 +123,7 @@ ignore = [
     "Q001",
     "Q002",
     "Q003",
-    "W191"
+    "W191",
 ]
 # List of all the ruff rules (includes why the rule matters)
 # https://docs.astral.sh/ruff/rules/
@@ -168,15 +150,12 @@ select = [
     "RUF",
     "SIM",
     "UP",
-    "W"
+    "W",
 ]
 unfixable = []
 
 [tool.ruff.lint.mccabe]
 max-complexity = 29
-
-[tool.ruff.lint.per-file-ignores]
-"**/{doc}/*" = ["D103"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

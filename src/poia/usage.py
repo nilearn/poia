@@ -1,3 +1,5 @@
+"""Package Of Interest Auditor."""
+
 import marimo
 
 __generated_with = "0.12.4"
@@ -13,7 +15,8 @@ def _(mo):
         Look for usage of a package of interest (POI) on public repos on github.
 
         Will list repo that:
-        - contain the POI in one the common files used to declare depdendencies (pyproject.toml, setup.cfg, requirements.txt...)
+        - contain the POI in one the common files used to declare dependencies
+          (pyproject.toml, setup.cfg, requirements.txt...)
         - import the POI in a python module or a ipython notebook.
 
         Then it will clone those repos and collect information about them.
@@ -110,9 +113,7 @@ def _(mo):
 
 @app.cell
 def _set_config(GITHUB_TOKEN, Path, __file__):
-    config: dict[
-        str, bool | dict[str, Path | bool | str | int | dict[str, str]]
-    ] = {
+    config: dict[str, bool | dict[str, Path | bool | str | int | dict[str, str]]] = {
         "CACHE": {
             "DIR": Path(__file__).parent / "tmp",
             "REPOSITORIES": "repositories.json",  # repositories to investigate
@@ -157,16 +158,11 @@ def _(config, itertools):
 
     QUERIES = [
         f'"{expression} {config["PACKAGE_OF_INTEREST"]}" AND {extension}'
-        for expression, extension in itertools.product(
-            ["from", "import"], EXTENSIONS
-        )
+        for expression, extension in itertools.product(["from", "import"], EXTENSIONS)
     ]
 
     QUERIES.extend(
-        [
-            f"{config['PACKAGE_OF_INTEREST']} in:file filename:{x}"
-            for x in config["LOCKFILES"]
-        ]
+        [f"{config['PACKAGE_OF_INTEREST']} in:file filename:{x}" for x in config["LOCKFILES"]]
     )
     return EXTENSIONS, QUERIES
 
@@ -199,9 +195,7 @@ def _(Path, config, logger, repos, shutil):
         user_name = url_path.parents[0].name
 
         if (config["CACHE"]["DIR"] / user_name / repo_name).exists():
-            if (
-                config["CACHE"]["DIR"] / user_name / repo_name / ".git"
-            ).exists():
+            if (config["CACHE"]["DIR"] / user_name / repo_name / ".git").exists():
                 cloned_repos.add(r)
             else:
                 shutil.rmtree(r)
@@ -231,9 +225,7 @@ def _(Path, config, logger, os, subprocess):
         (config["CACHE"]["DIR"] / user_name).mkdir(exist_ok=True)
 
         if (config["CACHE"]["DIR"] / user_name / repo_name).exists():
-            logger.info(
-                f"Repo {url.replace('https://github.com/', '')} already cloned. Skipping."
-            )
+            logger.info(f"Repo {url.replace('https://github.com/', '')} already cloned. Skipping.")
             return
 
         logger.info(f"Cloning {url.replace('https://github.com/', '')}.")
@@ -241,9 +233,7 @@ def _(Path, config, logger, os, subprocess):
         os.chdir(config["CACHE"]["DIR"] / user_name)
 
         try:
-            subprocess.run(
-                ["git", "clone", "--quiet", "--depth", "1", url], check=True
-            )
+            subprocess.run(["git", "clone", "--quiet", "--depth", "1", url], check=True)
             logger.info(f"Cloned: {url}")
         except subprocess.CalledProcessError:
             logger.error(f"Failed to clone: {url}")
@@ -285,9 +275,7 @@ def _(
 
     data_projects = []
 
-    ignore_list = load_cache(
-        config["CACHE"]["DIR"] / config["CACHE"]["IGNORE"]
-    )
+    ignore_list = load_cache(config["CACHE"]["DIR"] / config["CACHE"]["IGNORE"])
 
     excluded_dirs = {"venv", ".ipynb_checkpoints"}
 
@@ -338,9 +326,7 @@ def _(
                     )
 
             extracted_version = [
-                x["extracted_version"]
-                for x in versions
-                if x["extracted_version"] is not None
+                x["extracted_version"] for x in versions if x["extracted_version"] is not None
             ]
             if not extracted_version:
                 extracted_version = None
@@ -356,9 +342,7 @@ def _(
                 for py_file in d.glob(pat):
                     if any(
                         part in excluded_dirs
-                        for part in py_file.relative_to(
-                            config["CACHE"]["DIR"]
-                        ).parts
+                        for part in py_file.relative_to(config["CACHE"]["DIR"]).parts
                     ):
                         continue
 
@@ -368,9 +352,7 @@ def _(
                                 content = f.read()
                             else:
                                 notebook_node = nbformat.read(f, as_version=4)
-                                content, _ = exporter.from_notebook_node(
-                                    notebook_node
-                                )
+                                content, _ = exporter.from_notebook_node(notebook_node)
 
                     except UnicodeDecodeError:
                         logger.error(
@@ -380,11 +362,12 @@ def _(
 
                     except NotJSONError:
                         logger.error(
-                            f"Notebook does not appear to be JSON: {py_file.relative_to(config['CACHE']['DIR'])}"
+                            "Notebook does not appear to be JSON: "
+                            f"{py_file.relative_to(config['CACHE']['DIR'])}"
                         )
                         continue
 
-                    except:
+                    except Exception:
                         logger.error(
                             f"Error when reading: {py_file.relative_to(config['CACHE']['DIR'])}"
                         )
@@ -461,29 +444,23 @@ def _(
 def _(data_projects, pd):
     data_projects_df = pd.DataFrame(data_projects)
 
-    data_projects_df["last_commit"] = pd.to_datetime(
-        data_projects_df["last_commit"]
-    )
+    data_projects_df["last_commit"] = pd.to_datetime(data_projects_df["last_commit"])
 
     data_projects_df = data_projects_df[
-        ~(
-            data_projects_df["extracted_version"].eq(
-                "several_versions_detected"
-            )
-        )
+        ~(data_projects_df["extracted_version"].eq("several_versions_detected"))
     ]
 
-    data_projects_df["has_version"] = data_projects_df[
-        "extracted_version"
-    ].astype("bool", errors="ignore")
+    data_projects_df["has_version"] = data_projects_df["extracted_version"].astype(
+        "bool", errors="ignore"
+    )
 
     data_projects_df["has_imports"] = data_projects_df["import_counts"].astype(
         "bool", errors="ignore"
     )
 
-    data_projects_df["use_imports"] = data_projects_df[
-        "function_counts"
-    ].astype("bool", errors="ignore")
+    data_projects_df["use_imports"] = data_projects_df["function_counts"].astype(
+        "bool", errors="ignore"
+    )
 
     data_projects_df["include"] = (
         data_projects_df["has_version"]
@@ -491,9 +468,7 @@ def _(data_projects, pd):
         | data_projects_df["use_imports"]
     )
 
-    data_projects_df[["user", "repo"]] = data_projects_df["name"].str.split(
-        "/", expand=True
-    )
+    data_projects_df[["user", "repo"]] = data_projects_df["name"].str.split("/", expand=True)
 
     data_projects_df["duplicated_repo"] = data_projects_df["repo"].duplicated()
     return (data_projects_df,)
@@ -506,9 +481,7 @@ def _(data_projects_df):
 
 @app.cell
 def _(data_projects_df, mo):
-    transformed_df = mo.ui.dataframe(
-        data_projects_df.drop(["versions"], axis=1)
-    )
+    transformed_df = mo.ui.dataframe(data_projects_df.drop(["versions"], axis=1))
     # transformed_df
     return (transformed_df,)
 
@@ -584,18 +557,10 @@ def _(Version, mcolors, plt, px):
 
                 # Get Jet colors for each version using matplotlib
                 cmap = plt.get_cmap("jet", len(ordered_versions))
-                color_map = [
-                    mcolors.to_hex(cmap(i))
-                    for i in range(len(ordered_versions))
-                ]
+                color_map = [mcolors.to_hex(cmap(i)) for i in range(len(ordered_versions))]
 
         # Aggregate and sort modules by total count
-        order = (
-            df.groupby(col)["count"]
-            .sum()
-            .sort_values(ascending=False)
-            .index.tolist()
-        )
+        order = df.groupby(col)["count"].sum().sort_values(ascending=False).index.tolist()
 
         category_orders = {col: order}
         if color:
@@ -640,19 +605,15 @@ def _(mo):
         and those that have it as a dependency.
 
         Let's try to see how many projects have
-        the POI as depedency but do not import it.
+        the POI as dependency but do not import it.
         """
     )
 
 
 @app.cell
 def _(config, data_projects_df, plt, venn2):
-    as_dependency = data_projects_df["name"][
-        data_projects_df["has_version"]
-    ].to_list()
-    actually_import = data_projects_df["name"][
-        data_projects_df["has_imports"]
-    ].to_list()
+    as_dependency = data_projects_df["name"][data_projects_df["has_version"]].to_list()
+    actually_import = data_projects_df["name"][data_projects_df["has_imports"]].to_list()
     venn2(
         subsets=(
             set(as_dependency),
@@ -669,9 +630,7 @@ def _(config, data_projects_df, plt, venn2):
 
 @app.cell
 def _(actually_import, config, data_projects_df, plt, venn2):
-    use_import = data_projects_df["name"][
-        data_projects_df["use_imports"]
-    ].to_list()
+    use_import = data_projects_df["name"][data_projects_df["use_imports"]].to_list()
     venn2(
         subsets=(
             set(actually_import),
@@ -704,10 +663,7 @@ def _(Version, mcolors, plt, px):
 
                 # Get Jet colors for each version using matplotlib
                 cmap = plt.get_cmap("jet", len(ordered_versions))
-                color_map = [
-                    mcolors.to_hex(cmap(i))
-                    for i in range(len(ordered_versions))
-                ]
+                color_map = [mcolors.to_hex(cmap(i)) for i in range(len(ordered_versions))]
 
         start_date = df["last_commit"].min()
         end_date = df["last_commit"].max()
@@ -721,16 +677,12 @@ def _(Version, mcolors, plt, px):
             title=f"Analysis of {len(df)} projects",
         )
 
-        fig.update_layout(
-            xaxis_title="Last Commit Date", yaxis_title="Usage Count"
-        )
+        fig.update_layout(xaxis_title="Last Commit Date", yaxis_title="Usage Count")
 
         fig.update_xaxes(tickformat="%Y-%m")
 
         # Update the x-axis bin size to 3 months
-        fig.update_traces(
-            xbins={"start": start_date, "end": end_date, "size": "M3"}
-        )
+        fig.update_traces(xbins={"start": start_date, "end": end_date, "size": "M3"})
 
         fig.show()
 
@@ -746,9 +698,7 @@ def _(Version, px):
         df = df.dropna(subset=["extracted_version"])
 
         # Sort versions naturally
-        ordered_versions = sorted(
-            df["extracted_version"].unique(), key=Version
-        )
+        ordered_versions = sorted(df["extracted_version"].unique(), key=Version)
 
         fig = px.histogram(
             df,
@@ -756,9 +706,7 @@ def _(Version, px):
             category_orders={"extracted_version": ordered_versions},
             title=f"Analysis of {len(df)} projects",
         )
-        fig.update_layout(
-            xaxis_title="Version", yaxis_title="Repository Count"
-        )
+        fig.update_layout(xaxis_title="Version", yaxis_title="Repository Count")
         fig.show()
 
     return (plot_versions,)
@@ -772,9 +720,7 @@ def _(Path, logger, subprocess):
 
         try:
             # Get the Unix timestamp of the last commit
-            result = subprocess.run(
-                cmd, shell=True, check=True, capture_output=True, text=True
-            )
+            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
             timestamp = result.stdout.strip()
 
             # Convert to readable date format
@@ -815,9 +761,7 @@ def _(ast, warnings):
                     if alias.name.startswith(config["PACKAGE_OF_INTEREST"]):
                         submodules = alias.name.split(".")[1:]
                         if len(submodules) > 0:
-                            import_counts[submodules[0]] = (
-                                import_counts.get(submodules[0], 0) + 1
-                            )
+                            import_counts[submodules[0]] = import_counts.get(submodules[0], 0) + 1
             elif (
                 isinstance(node, ast.ImportFrom)
                 and node.module
@@ -825,15 +769,11 @@ def _(ast, warnings):
             ):
                 submodules = node.module.split(".")[1:]
                 if len(submodules) > 0:
-                    import_counts[submodules[0]] = (
-                        import_counts.get(submodules[0], 0) + 1
-                    )
+                    import_counts[submodules[0]] = import_counts.get(submodules[0], 0) + 1
                 else:
                     submodules = [submod.name for submod in node.names]
                     for submodule in submodules:
-                        import_counts[submodule] = (
-                            import_counts.get(submodule, 0) + 1
-                        )
+                        import_counts[submodule] = import_counts.get(submodule, 0) + 1
 
         return import_counts
 
@@ -861,11 +801,12 @@ def _(ast, warnings):
                 for alias in node.names:
                     if alias.name.startswith(package):
                         alias_map[alias.asname or alias.name] = alias.name
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                if node.module.startswith(package):
-                    for alias in node.names:
-                        full_name = f"{node.module}.{alias.name}"
-                        alias_map[alias.asname or alias.name] = full_name
+            elif (
+                isinstance(node, ast.ImportFrom) and node.module and node.module.startswith(package)
+            ):
+                for alias in node.names:
+                    full_name = f"{node.module}.{alias.name}"
+                    alias_map[alias.asname or alias.name] = full_name
 
         # Second pass: find all class usages
         class ClassVisitor(ast.NodeVisitor):
@@ -875,9 +816,7 @@ def _(ast, warnings):
                     full_ref = alias_map.get(value.id)
                     if full_ref and full_ref.startswith(package):
                         class_name = node.attr
-                        class_usage[class_name] = (
-                            class_usage.get(class_name, 0) + 1
-                        )
+                        class_usage[class_name] = class_usage.get(class_name, 0) + 1
                 self.generic_visit(node)
 
             def visit_Name(self, node):
@@ -885,9 +824,7 @@ def _(ast, warnings):
                 if full_ref and full_ref.startswith(package):
                     # Handle direct usage of imported class
                     class_name = full_ref.split(".")[-1]
-                    class_usage[class_name] = (
-                        class_usage.get(class_name, 0) + 1
-                    )
+                    class_usage[class_name] = class_usage.get(class_name, 0) + 1
                 self.generic_visit(node)
 
         ClassVisitor().visit(tree)
@@ -899,16 +836,13 @@ def _(ast, warnings):
 
 @app.cell
 def _(Path, call_api, load_cache, logger, update_cache):
-    def search_repositories(
-        queries: list[str], config, cache_file: Path | None = None
-    ):
+    def search_repositories(queries: list[str], config, cache_file: Path | None = None):
         """Search GitHub for some queries.
 
         Save responses and list of repos.
         """
         repo_url_cache_file = (
-            config["CACHE"]["DIR"]
-            / f"{config['PACKAGE_OF_INTEREST']}_{cache_file}"
+            config["CACHE"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']}_{cache_file}"
         )
 
         if cache_file and not config["CACHE"]["REFRESH"]:
@@ -918,9 +852,7 @@ def _(Path, call_api, load_cache, logger, update_cache):
             else:
                 logger.info("No cache file found.")
 
-        logger.info(
-            f"🔍 Searching repos using '{config['PACKAGE_OF_INTEREST']}'..."
-        )
+        logger.info(f"🔍 Searching repos using '{config['PACKAGE_OF_INTEREST']}'...")
 
         repo_urls = set()
 
@@ -999,9 +931,7 @@ def _load_cache(Path, json):
 def _(logger, quote, requests, time):
     def call_api(query: str, page: int, config):
         """Wrap github API call and response handling."""
-        url = config["GITHUB_API"]["SEARCH"].format(
-            query=quote(query), page=page
-        )
+        url = config["GITHUB_API"]["SEARCH"].format(query=quote(query), page=page)
         response = requests.get(url, headers=config["GITHUB_API"]["HEADERS"])
 
         if response.status_code == 403:
@@ -1013,9 +943,7 @@ def _(logger, quote, requests, time):
             time.sleep(config["GITHUB_API"]["RATE_LIMIT_SLEEP_TIME"])
 
         elif response.status_code == 422:
-            logger.error(
-                f"GitHub API query error (422). Check query format: {query}"
-            )
+            logger.error(f"GitHub API query error (422). Check query format: {query}")
 
         elif response.status_code != 200:
             logger.error(f"Error {response.status_code}: {response.json()}")
@@ -1061,9 +989,7 @@ def _(Path, print, toml):
                     parts = dep.split(" ", 1)
                     return parts[1].strip() if len(parts) > 1 else default
 
-            for group_deps in project.get(
-                "optional-dependencies", {}
-            ).values():
+            for group_deps in project.get("optional-dependencies", {}).values():
                 for dep in group_deps:
                     if dep.lower().startswith(config["PACKAGE_OF_INTEREST"]):
                         parts = dep.split(" ", 1)
@@ -1113,15 +1039,9 @@ def _(configparser, print):
                         deps = value.splitlines()
                         for dep in deps:
                             dep = dep.strip()
-                            if dep.lower().startswith(
-                                config["PACKAGE_OF_INTEREST"]
-                            ):
+                            if dep.lower().startswith(config["PACKAGE_OF_INTEREST"]):
                                 parts = dep.split(" ", 1)
-                                return (
-                                    parts[1].strip()
-                                    if len(parts) > 1
-                                    else default
-                                )
+                                return parts[1].strip() if len(parts) > 1 else default
 
             return None
         except Exception as e:

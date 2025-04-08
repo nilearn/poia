@@ -19,7 +19,6 @@ repos:
     -   id: mixed-line-ending
     -   id: trailing-whitespace
 
-
     # Checks for spelling errors
 -   repo: https://github.com/codespell-project/codespell
     rev: v2.4.1
@@ -58,4 +57,5 @@ repos:
     hooks:
     -   id: mypy
         files: src
+        additional_dependencies: [types-tqdm, types-toml, types-requests, pandas-stubs]
         args: [--config-file, pyproject.toml, --pretty]

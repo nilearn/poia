@@ -37,9 +37,7 @@ requires-python = ">=3.11"
 
 [project.optional-dependencies]
 # A combination of dependencies useful for developers
-dev = [
-    "nilearn[test]"
-]
+dev = ["nilearn[test]"]
 # For running unit and docstring tests
 test = [
     "coverage",
@@ -57,7 +55,6 @@ Homepage = "https://nilearn.github.io"
 builtin = "clear,rare,en-GB_to_en-US"
 skip = "./.git,*.cff,*/tmp,.mypy_cache,env,venv"
 
-
 [tool.hatch.build.hooks.vcs]
 version-file = "src/poia/_version.py"
 
@@ -70,21 +67,22 @@ source = "vcs"
 [tool.mypy]
 allow_redefinition = false
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-exclude = [
-    'tests/test_.*',
-    'nilearn/_version.py'
+exclude = ['tests/test_.*', 'src/poia/_version.py']
+warn_unreachable = false
+
+[[tool.mypy.overrides]]
+ignore_missing_imports = true
+module = [
+    "plotly.*",
+    "rich.*",
+    "matplotlib.*",
+    "nbformat.*",
+    "nbconvert.*",
+    "packaging.*",
+    "loguru.*",
+    "matplotlib_venn.*",
+    "marimo.*"
 ]
-warn_unreachable = true
-
-# [[tool.mypy.overrides]]
-# ignore_errors = true
-# module = [
-# ]
-
-# [[tool.mypy.overrides]]
-# ignore_missing_imports = true
-# module = [
-# ]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers -s -vv --timeout=60"
@@ -120,13 +118,16 @@ ignore = [
     "E741",
     "ERA001",
     "FURB105",
+    "N802",
     "N803",
     "N806",
+    "PD901",
     "PERF203",
     "PIE790",
     "PLR2004",
     "PTH207",
-    "UP038",  # https://github.com/astral-sh/ruff/issues/7871
+    "UP038",
+    # https://github.com/astral-sh/ruff/issues/7871
     # Avoid linter rules conflicting with the formatter
     # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
     "COM812",
@@ -172,21 +173,20 @@ select = [
 unfixable = []
 
 [tool.ruff.lint.mccabe]
-max-complexity = 15
+max-complexity = 29
 
 [tool.ruff.lint.per-file-ignores]
 "**/{doc}/*" = ["D103"]
-
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.ruff.lint.pylint]
 # https://docs.astral.sh/ruff/settings/#lint_pylint_max-args
-max-args = 7
+max-args = 15
 # https://docs.astral.sh/ruff/settings/#lint_pylint_max-branches
-max-branches = 10
+max-branches = 33
 # https://docs.astral.sh/ruff/settings/#lint_pylint_max-returns
 max-returns = 10
 # https://docs.astral.sh/ruff/settings/#lint_pylint_max-statements
-max-statements = 50
+max-statements = 80

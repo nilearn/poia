@@ -75,9 +75,9 @@ def _(Path, config, mo, repos, shutil):
             else:
                 shutil.rmtree(r)
 
-        if (config["CACHE"]["DIR"] / user_name).exists() and len(
-            list((config["CACHE"]["DIR"] / user_name).iterdir())
-        ) == 0:
+        if (config["CACHE"]["DIR"] / user_name).exists() and not list(
+            (config["CACHE"]["DIR"] / user_name).iterdir()
+        ):
             shutil.rmtree(config["CACHE"]["DIR"] / user_name)
 
     mo.md(
@@ -968,8 +968,8 @@ def _(
                         "last_commit": last_commit,
                         "versions": versions,
                         "extracted_version": extracted_version,
-                        "import_counts": import_counts if import_counts else None,
-                        "function_counts": class_counts if class_counts else None,
+                        "import_counts": import_counts or None,
+                        "function_counts": class_counts or None,
                         "n_python_file": n_python_file,
                         "n_notebook": n_notebook,
                     }

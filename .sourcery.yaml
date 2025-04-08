@@ -13,7 +13,8 @@
 version: '1'
 
 ignore: # A list of paths or files which Sourcery will ignore.
--   nilearn/_version.py
+-   poia/_version.py
+-   poia/tmp
 
 
 rule_settings:

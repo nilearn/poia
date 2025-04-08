@@ -41,7 +41,7 @@ requires-python = ">=3.11"
 [project.optional-dependencies]
 # For running unit and docstring tests
 test = [
-    "pytest>=6.0.0",
+    "pytest>=6.0.0"
 ]
 
 [project.urls]

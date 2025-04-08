@@ -1,0 +1,58 @@
+name: publish
+
+on:
+    push:
+        branches:
+        -   main
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+# Force to use color
+env:
+    FORCE_COLOR: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v4
+
+            -   name: Install the latest version of uv
+                uses: astral-sh/setup-uv@v5
+
+            -   name: Setup python
+                uses: actions/setup-python@v5
+                with:
+                    python-version: 3.12
+
+            -   name: Install dependencies
+                run: uv pip install .
+
+            -   name: 📄 Export notebook
+                run: marimo export html-wasm poia/poia.py -o _site --mode run
+
+            -   name: 📦 Upload Pages Artifact
+                uses: actions/upload-pages-artifact@v3
+                with:
+                    path: _site
+
+    deploy:
+        needs: build
+        runs-on: ubuntu-latest
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+
+        permissions:
+            pages: write
+            id-token: write
+
+        steps:
+            -   name: 🌐 Deploy to GitHub Pages
+                id: deployment
+                uses: actions/deploy-pages@v4
+                with:
+                    artifact_name: github-pages

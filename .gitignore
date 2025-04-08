@@ -1,5 +1,7 @@
 .tox
 
+uv.lock
+
 tmp
 
 __pycache__
@@ -15,6 +17,7 @@ __pycache__
 build
 dist/
 _version.py
+_site
 
 # notebooks
 .ipynb_checkpoints

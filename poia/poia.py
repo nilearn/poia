@@ -19,7 +19,7 @@
 
 import marimo
 
-__generated_with = "0.12.4"
+__generated_with = "0.12.5"
 app = marimo.App(width="full", app_title="POIA")
 
 
@@ -43,13 +43,11 @@ def _(config, mo):
         Then it will clone those repos, collect and plot information about them.
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Search repos on github""")
-    return
 
 
 @app.cell
@@ -95,7 +93,6 @@ def _(Path, config, mo, repos, shutil):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Cloning repos""")
-    return
 
 
 @app.cell(disabled=True)
@@ -115,19 +112,16 @@ def _(mo):
         Extract useful data from each repository and save them as a JSON to disk.
         """
     )
-    return
 
 
 @app.cell(disabled=True)
 def _(config, extract_data):
     extract_data(config)
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""Load data from JSON.""")
-    return
 
 
 @app.cell
@@ -160,7 +154,6 @@ def _(config, mo):
           only python files, jupyter notebook or both.
         """
     )
-    return
 
 
 @app.cell
@@ -209,13 +202,11 @@ def _(data_projects_df, mo):
         of them seem to be duplicated.
         """
     )
-    return
 
 
 @app.cell
 def _(data_projects_df):
     data_projects_df[data_projects_df["duplicated_repo"]][["user", "repo"]]
-    return
 
 
 @app.cell(hide_code=True)
@@ -226,13 +217,11 @@ def _(data_projects_df, mo):
         repositories are included in further analysis.
         """
     )
-    return
 
 
 @app.cell
 def _(data_projects_df):
     data_projects_df[data_projects_df["include"]]
-    return
 
 
 @app.cell
@@ -245,7 +234,6 @@ def _(data_projects_df, mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Plotting results""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -293,7 +281,6 @@ def _(config, data_projects_df, mo, plt, venn2):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Last commit date""")
-    return
 
 
 @app.cell
@@ -350,7 +337,6 @@ def _(data_projects_df, mo, plot_versions):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Subpackage use""")
-    return
 
 
 @app.cell
@@ -394,7 +380,7 @@ def _(data_projects_df, extract_object_count):
     return (function_df,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(config, function_df, mo, plot_usage, radio):
     function_fig = plot_usage(function_df, color=radio.value)
     function_fig.show()
@@ -418,13 +404,11 @@ def _(config, function_df, mo, plot_usage, radio):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Helper functions""")
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Logging""")
-    return
 
 
 @app.cell
@@ -444,13 +428,13 @@ def _():
         )
 
         return logging.getLogger("cohort_creator")
+
     return RichHandler, logging, poia_logger
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Plotting""")
-    return
 
 
 @app.cell
@@ -493,6 +477,7 @@ def _(Version, mcolors, plt, px):
         fig.update_layout(xaxis_title=col, yaxis_title="Usage Count")
 
         return fig
+
     return (plot_usage,)
 
 
@@ -537,6 +522,7 @@ def _(Version, mcolors, plt, px):
         fig.update_traces(xbins={"start": start_date, "end": end_date, "size": "M3"})
 
         return fig
+
     return (plot_repos,)
 
 
@@ -561,13 +547,13 @@ def _(Version, px):
         )
         fig.update_layout(xaxis_title="Version", yaxis_title="Repository Count")
         return fig
+
     return (plot_versions,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### AST parsing""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -604,6 +590,7 @@ def _(ast, warnings):
                         import_counts[submodule] = import_counts.get(submodule, 0) + 1
 
         return import_counts
+
     return (count_imports,)
 
 
@@ -657,13 +644,13 @@ def _(ast, warnings):
         ClassVisitor().visit(tree)
 
         return class_usage
+
     return (count_functions,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Github repo search""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -690,6 +677,7 @@ def _(logger, quote, requests, time):
         time.sleep(config["GITHUB_API"]["SLEEP_TIME"])
 
         return response
+
     return (call_api,)
 
 
@@ -750,13 +738,13 @@ def _(Path, call_api, load_cache, logger, update_cache):
         logger.info("Done.")
 
         return list(repo_urls)
+
     return (search_repositories,)
 
 
 @app.cell
 def _(mo):
     mo.md(r"""### Cloning""")
-    return
 
 
 @app.cell
@@ -782,13 +770,13 @@ def _(Path, config, logger, os, subprocess):
             logger.info(f"Cloned: {url}")
         except subprocess.CalledProcessError:
             logger.error(f"Failed to clone: {url}")
+
     return (clone_repo,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### IO""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -807,6 +795,7 @@ def _update_cache(Path, json, load_cache, logger):
                 logger.error("TypeError: unhashable type: 'dict'")
         with cache_file.open("w") as f:
             json.dump(cache, f, indent=2)
+
     return (update_cache,)
 
 
@@ -818,13 +807,13 @@ def _load_cache(Path, json):
             with cache_file.open("r") as f:
                 return json.load(f)
         return []
+
     return (load_cache,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Data extraction""")
-    return
 
 
 @app.cell
@@ -846,6 +835,7 @@ def _(pd):
                     }
                 )
         return pd.DataFrame(object_list)
+
     return (extract_object_count,)
 
 
@@ -990,6 +980,7 @@ def _(
 
                 logger.info("\tDONE")
         logger.info("Data extraction done.")
+
     return (extract_data,)
 
 
@@ -1019,13 +1010,13 @@ def _(Path, logger, subprocess):
         except subprocess.CalledProcessError as e:
             logger.error(f"Error: {e}")
             return None
+
     return (get_last_commit_date,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Version handling""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -1079,6 +1070,7 @@ def _(
             extracted_version = next(iter(set(extracted_version)))
 
         return versions, extracted_version
+
     return (get_version,)
 
 
@@ -1096,6 +1088,7 @@ def _(re):
             if match:
                 return match.group(1)
         return "0.0.0"
+
     return (extract_version,)
 
 
@@ -1103,7 +1096,6 @@ def _(re):
 def test_extract_version(extract_version):
     assert extract_version("") == "0.0.0"
     assert extract_version("nilearn==0.1") == "0.1"
-    return
 
 
 @app.cell(hide_code=True)
@@ -1143,6 +1135,7 @@ def _(Path, print, toml):
         except Exception as e:
             print(f"Error reading pyproject.toml: {e}")
             return None
+
     return (get_version_from_pyproject,)
 
 
@@ -1179,13 +1172,13 @@ def _(configparser, print):
         except Exception as e:
             print(f"Error reading setup.cfg: {e}")
             return None
+
     return (get_version_from_setup_cfg,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Configuration""")
-    return
 
 
 @app.cell
@@ -1248,7 +1241,6 @@ def _(config, itertools):
 @app.cell
 def _(mo):
     mo.md(r"""## Imports""")
-    return
 
 
 @app.cell
@@ -1287,6 +1279,7 @@ def _():
     from nbformat.reader import NotJSONError
     from packaging.version import Version
     from rich import print
+
     return (
         IPython,
         NotJSONError,
@@ -1327,7 +1320,6 @@ def _():
 @app.cell
 def _(mo):
     mo.md(r"""## Globals""")
-    return
 
 
 @app.cell

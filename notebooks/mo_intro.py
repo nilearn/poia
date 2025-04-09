@@ -9,6 +9,7 @@ app = marimo.App(width="medium", app_title="Intro to Marimo notebooks")
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""# Marimo notebooks""")
+    return
 
 
 @app.cell
@@ -61,6 +62,7 @@ def _(mo):
         Viewable in the side panel ⬅️
         """
     )
+    return
 
 
 @app.cell(hide_code=True)
@@ -73,6 +75,7 @@ def _(mo):
         You can totally have your imports [at the end](#imports).
         """
     )
+    return
 
 
 @app.cell(hide_code=True)
@@ -84,6 +87,7 @@ def _(mo):
         Variables cannot be redefined.
         """
     )
+    return
 
 
 @app.cell
@@ -95,6 +99,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Qualite of life improvements: it's just python !!""")
+    return
 
 
 @app.cell(hide_code=True)
@@ -115,11 +120,13 @@ def _(mo, show_intro_nb):
             ),
         ]
     )
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""All cells are just function with a `@app.cell()` decorator.""")
+    return
 
 
 @app.cell(hide_code=True)
@@ -133,6 +140,7 @@ def _(mo):
         `
         """
     )
+    return
 
 
 @app.cell(hide_code=True)
@@ -192,24 +200,26 @@ def _(mo, show_intro_nb):
             ),
         ]
     )
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Cells can be tested !!!!""")
+    return
 
 
 @app.cell
 def function_to_test():
     def function_to_test(a):
         return a + 1
-
     return (function_to_test,)
 
 
 @app.cell
 def test_function(function_to_test):
     assert function_to_test(3) == 4
+    return
 
 
 @app.cell(hide_code=True)
@@ -236,6 +246,7 @@ def _(mo):
         `
         """
     )
+    return
 
 
 @app.cell(hide_code=True)
@@ -251,13 +262,13 @@ def _(mo):
         ///
         """
     )
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""More info in the [marimo documentation](https://docs.marimo.io/guides/testing/pytest/)."""
-    )
+    mo.md(r"""More info in the [marimo documentation](https://docs.marimo.io/guides/testing/pytest/).""")
+    return
 
 
 @app.cell(hide_code=True)
@@ -269,6 +280,7 @@ def _(mo):
         Interactive table with easily accessible 'transform' operations.
         """
     )
+    return
 
 
 @app.cell
@@ -315,6 +327,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Plotting""")
+    return
 
 
 @app.cell
@@ -374,6 +387,7 @@ def _(mo):
           for the notebook execution to continue.
         """
     )
+    return
 
 
 @app.cell(hide_code=True)
@@ -386,6 +400,7 @@ def _(mo):
         - deploy to github pages and other places
         """
     )
+    return
 
 
 @app.cell
@@ -401,9 +416,10 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Helper functions""")
+    return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     def show_intro_nb(break_condition="def cell_2("):
         with (mo.notebook_location() / "mo_intro.py").open("r") as f:
@@ -414,11 +430,10 @@ def _(mo):
             intro.append(l)
             if l.startswith(break_condition):
                 return intro
-
     return (show_intro_nb,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import matplotlib.colors as mcolors
     import matplotlib.pyplot as plt
@@ -467,7 +482,6 @@ def _():
         fig.update_traces(xbins={"start": start_date, "end": end_date, "size": "M3"})
 
         return fig
-
     return Version, mcolors, plot_repos, plt, px
 
 

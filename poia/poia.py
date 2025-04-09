@@ -19,7 +19,7 @@
 
 import marimo
 
-__generated_with = "0.12.5"
+__generated_with = "0.12.0"
 app = marimo.App(width="full", app_title="POIA")
 
 
@@ -482,7 +482,7 @@ def _(Version, mcolors, plt, px):
 
 
 @app.cell
-def _(Version, mcolors, plt, px):
+def plot_repos(Version, mcolors, plt, px):
     def plot_repos(df, color=None):
         df.drop_duplicates(subset=["name"])
         df = df[df["include"]]

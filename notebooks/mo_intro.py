@@ -1,27 +1,14 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "marimo",
-#     "matplotlib==3.10.1",
-#     "nilearn==0.11.1",
-# ]
-# ///
 """Marimo demo."""
 
 import marimo
 
 __generated_with = "0.12.0"
-app = marimo.App(
-    width="medium",
-    app_title="Intro to Marimo notebooks",
-    layout_file="layouts/mo_intro.slides.json",
-)
+app = marimo.App(width="medium", app_title="Intro to Marimo notebooks")
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""# Marimo notebooks""")
-    return
 
 
 @app.cell
@@ -32,9 +19,9 @@ def _(mo):
     ## Improve reproducibility - part 1 : DAG
 
     Value from one cell...
-    ```
+    `
     a = {a}
-    ```
+    `
     """)
     return (a,)
 
@@ -45,9 +32,9 @@ def cell_2(a, mo):
 
     mo.md(f"""
     ... will change in all other cells...
-    ```
+    `
     b = a + 2 = {a} + 2 = {a + 2}
-    ```
+    `
     """)
     return (b,)
 
@@ -58,9 +45,9 @@ def _(a, b, mo):
 
     mo.md(f"""
     ... ALL other cells
-    ```
+    `
     c = a + b = {a} + {b} = {a + b}
-    ```
+    `
     """)
     return (c,)
 
@@ -74,7 +61,6 @@ def _(mo):
         Viewable in the side panel ⬅️
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -87,7 +73,6 @@ def _(mo):
         You can totally have your imports [at the end](#imports).
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -99,7 +84,6 @@ def _(mo):
         Variables cannot be redefined.
         """
     )
-    return
 
 
 @app.cell
@@ -111,7 +95,6 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Qualite of life improvements: it's just python !!""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -119,7 +102,7 @@ def _(mo, show_intro_nb):
     mo.vstack(
         [
             mo.md(
-                f"""
+                """
         For example, this is how this notebook starts...
         """
             ),
@@ -132,13 +115,11 @@ def _(mo, show_intro_nb):
             ),
         ]
     )
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""All cells are just function with a `@app.cell()` decorator.""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -147,12 +128,11 @@ def _(mo):
         r"""
         You can also just do:
 
-        ```bash
-        python mo_intro.py
-        ```
+        `bash
+        python notebooks/mo_intro.py
+        `
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -164,7 +144,7 @@ def _(mo):
     fig = plot_img(template)
     show()
 
-    mo.md(f"""
+    mo.md("""
     ## Improve reproducibility - part 2 : dependency tracking
 
     This cell imports things from nilearn
@@ -174,16 +154,16 @@ def _(mo):
 
     So let's rerun the notebook but in 'sandbox' mode:
 
-    ```bash
-    marimo edit --sandbox mo_intro.py
-    ```
+    `bash
+    marimo edit --sandbox notebooks/mo_intro.py
+    `
 
     This will create a virtual environment with uv and installed the required dependencies.
 
-    ```
+    `
     Running in a sandbox: uv run --isolated --no-project --with-requirements /tmp/tmpu9dq4o5f.txt --refresh marimo edit mo_intro.py
     Installed 35 packages in 32ms
-    ```
+    `
 
     You will then be prompted to install any missing dependencies.
 
@@ -198,7 +178,7 @@ def _(mo, show_intro_nb):
     mo.vstack(
         [
             mo.md(
-                f"""
+                """
         Notice how the beginning of the notebook was updated
         with toml-like definition of the dependencies of the notebook.
         """
@@ -212,23 +192,34 @@ def _(mo, show_intro_nb):
             ),
         ]
     )
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Cells can be tested !!!!""")
-    return
+
+
+@app.cell
+def function_to_test():
+    def function_to_test(a):
+        return a + 1
+
+    return (function_to_test,)
+
+
+@app.cell
+def test_function(function_to_test):
+    assert function_to_test(3) == 4
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         r"""
-        Name cells that contain a  `"test_..."` and run pytest on your notebook.
+        Name cells that contain a  test_..."test_..." and run pytest on your notebook.
 
-        ```bash
-        pytest mo_intro.py
+        `bash
+        $ pytest notebooks/mo_intro.py
 
         ================================================== test session starts ===================================================
         platform linux -- Python 3.12.9, pytest-8.3.4, pluggy-1.5.0 -- /home/remi-gau/miniconda3/bin/python3
@@ -237,56 +228,120 @@ def _(mo):
         rootdir: /home/remi-gau/github/poia
         configfile: pyproject.toml
         plugins: reporter-0.5.3, cov-6.0.0, timeout-2.3.1, anyio-4.9.0, xdist-3.6.1, reporter-html1-0.9.2, nbmake-1.5.5, randomly-3.16.0, csv-3.0.0
-        collected 1 item                                                                                                         
+        collected 1 item
 
         mo_intro.py::test_function PASSED
 
         =================================================== 1 passed in 0.39s ====================================================
-        ```
+        `
         """
     )
-    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+        /// attention | BUG
+
+        Testing with pytest directly would sometimes fail for marimo >= 0.12.1.
+
+        [Bug reported](https://github.com/marimo-team/marimo/issues/4440) and should be fixed in next release.
+
+        ///
+        """
+    )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""More info in the [marimo documentation](https://docs.marimo.io/guides/testing/pytest/)."""
+    )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+        ## Rich display of dataframes
+
+        Interactive table with easily accessible 'transform' operations.
+        """
+    )
 
 
 @app.cell
-def function_to_test():
-    def function_to_test(a):
-        return a + 1
-    return (function_to_test,)
+def _(mo):
+    import json
+
+    data_file = mo.notebook_location() / ".." / "poia" / "tmp" / "nilearn_content.json"
+    with data_file.open("r") as f:
+        content = json.load(f)
+    return content, data_file, f, json
+
+
+@app.cell(disabled=True)
+def _(content):
+    import pandas as pd
+
+    nilearn_repos = pd.DataFrame(content)
+
+    nilearn_repos["last_commit"] = pd.to_datetime(nilearn_repos["last_commit"])
+
+    nilearn_repos = nilearn_repos[
+        ~(nilearn_repos["extracted_version"].eq("several_versions_detected"))
+    ]
+
+    nilearn_repos["include"] = nilearn_repos["function_counts"].astype("bool", errors="ignore")
+
+    nilearn_repos
+    return nilearn_repos, pd
 
 
 @app.cell
-def test_function(function_to_test):
-    assert function_to_test(3) == 4
+def _(mo, nilearn_repos):
+    transformed_df = mo.ui.dataframe(nilearn_repos)
+    transformed_df
+    return (transformed_df,)
+
+
+@app.cell
+def _():
+    # nilearn_repos.groupby(["extracted_version"], dropna=True).count()
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""More info in the [marimo documentation](https://docs.marimo.io/guides/testing/pytest/).""")
-    return
+    mo.md(r"""## Plotting""")
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ## Rich display of dataframes
-        """
+    options = ["", "extracted_version"]
+    radio = mo.ui.radio(options=options)
+    return options, radio
+
+
+@app.cell(hide_code=True)
+def _(mo, nilearn_repos, plot_repos, radio):
+    repo_fig = plot_repos(nilearn_repos, color=radio.value)
+    repo_fig.show()
+
+    mo.hstack(
+        [
+            mo.vstack([mo.md("color"), radio]),
+        ],
+        align="center",
     )
-    return
-
-
-@app.cell
-def _():
-    return
+    return (repo_fig,)
 
 
 @app.cell
 def _(mo):
     def foo(a):
         a
-
 
     mo.md(
         r"""
@@ -319,7 +374,6 @@ def _(mo):
           for the notebook execution to continue.
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -328,12 +382,10 @@ def _(mo):
         r"""
         ## Not mentioned
 
-        - interactive UI elements
         - code snippets
         - deploy to github pages and other places
         """
     )
-    return
 
 
 @app.cell
@@ -349,7 +401,6 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Helper functions""")
-    return
 
 
 @app.cell
@@ -363,7 +414,61 @@ def _(mo):
             intro.append(l)
             if l.startswith(break_condition):
                 return intro
+
     return (show_intro_nb,)
+
+
+@app.cell
+def _():
+    import matplotlib.colors as mcolors
+    import matplotlib.pyplot as plt
+    import plotly.express as px
+    from packaging.version import Version
+
+    def plot_repos(df, color=None):
+        if color == "":
+            color = None
+
+        df.drop_duplicates(subset=["name"])
+        df = df[df["include"]]
+
+        category_orders = None
+        color_map = None
+        if color:
+            df = df.dropna(subset=[color])
+
+            # Sort version labels naturally
+            category_orders = {color: sorted(df[color].unique())}
+            if color == "extracted_version":
+                ordered_versions = sorted(df[color].unique(), key=Version)
+                category_orders = {color: ordered_versions}
+
+                # Get Jet colors for each version using matplotlib
+                cmap = plt.get_cmap("jet", len(ordered_versions))
+                color_map = [mcolors.to_hex(cmap(i)) for i in range(len(ordered_versions))]
+
+        start_date = df["last_commit"].min()
+        end_date = df["last_commit"].max()
+
+        fig = px.histogram(
+            df,
+            x="last_commit",
+            color=color,
+            category_orders=category_orders,
+            color_discrete_sequence=color_map,
+            title=f"Analysis of {len(df)} repositories",
+        )
+
+        fig.update_layout(xaxis_title="Last Commit Date", yaxis_title="Usage Count")
+
+        fig.update_xaxes(tickformat="%Y-%m")
+
+        # Update the x-axis bin size to 3 months
+        fig.update_traces(xbins={"start": start_date, "end": end_date, "size": "M3"})
+
+        return fig
+
+    return Version, mcolors, plot_repos, plt, px
 
 
 if __name__ == "__main__":

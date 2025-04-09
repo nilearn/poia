@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import subprocess
-import argparse
-from typing import List
 from pathlib import Path
 
 
 def export_html_wasm(notebook_path: str, output_dir: str, as_app: bool = False) -> bool:
     """Export a single marimo notebook to HTML format.
 
-    Returns:
+    Returns
+    -------
         bool: True if export succeeded, False otherwise
     """
     output_path = notebook_path.replace(".py", ".html")
@@ -39,7 +39,7 @@ def export_html_wasm(notebook_path: str, output_dir: str, as_app: bool = False) 
         return False
 
 
-def generate_index(all_notebooks: List[str], output_dir: str) -> None:
+def generate_index(all_notebooks: list[str], output_dir: str) -> None:
     """Generate the index.html file."""
     print("Generating index.html")
 
@@ -81,18 +81,16 @@ def generate_index(all_notebooks: List[str], output_dir: str) -> None:
   </body>
 </html>"""
             )
-    except IOError as e:
+    except OSError as e:
         print(f"Error generating index.html: {e}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build marimo notebooks")
-    parser.add_argument(
-        "--output-dir", default="_site", help="Output directory for built files"
-    )
+    parser.add_argument("--output-dir", default="_site", help="Output directory for built files")
     args = parser.parse_args()
 
-    all_notebooks: List[str] = []
+    all_notebooks: list[str] = []
     for directory in ["notebooks", "apps"]:
         dir_path = Path(directory)
         if not dir_path.exists():

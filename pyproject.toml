@@ -111,7 +111,9 @@ ignore = [
     "N802",
     "D103",
     "PD901",
+    "PLR1711",
     "PLR2004",
+    "RUF001",
     # https://github.com/astral-sh/ruff/issues/7871
     # Avoid linter rules conflicting with the formatter
     # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
@@ -159,6 +161,10 @@ unfixable = []
 
 [tool.ruff.lint.mccabe]
 max-complexity = 29
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/mo_intro.py" = ["E501", "E741"]
+"scripts/build.py" = ["E501"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"

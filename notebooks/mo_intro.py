@@ -3,39 +3,42 @@
 import marimo
 
 __generated_with = "0.12.0"
-app = marimo.App(width="medium", app_title="Intro to Marimo notebooks")
+app = marimo.App(
+    width="medium",
+    app_title="Intro to Marimo notebooks",
+    layout_file="layouts/mo_intro.slides.json",
+)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""# Marimo notebooks""")
-    return
 
 
 @app.cell
 def _(mo):
-    a = 9674573
+    a = 2
 
     mo.md(f"""
     ## Improve reproducibility - part 1 : DAG
 
     Value from one cell...
-    `
+    ```
     a = {a}
-    `
+    ```
     """)
     return (a,)
 
 
 @app.cell
 def cell_2(a, mo):
-    b = a + 2
+    b = a + 5
 
     mo.md(f"""
     ... will change in all other cells...
-    `
+    ```
     b = a + 2 = {a} + 2 = {a + 2}
-    `
+    ```
     """)
     return (b,)
 
@@ -46,9 +49,9 @@ def _(a, b, mo):
 
     mo.md(f"""
     ... ALL other cells
-    `
+    ```
     c = a + b = {a} + {b} = {a + b}
-    `
+    ```
     """)
     return (c,)
 
@@ -62,20 +65,18 @@ def _(mo):
         Viewable in the side panel ⬅️
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         r"""
-        So your cells will always be exectued in the correct order,
+        So your cells will always be executed in the correct order,
         no matter the order of your cells.
 
         You can totally have your imports [at the end](#imports).
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -87,46 +88,26 @@ def _(mo):
         Variables cannot be redefined.
         """
     )
-    return
 
 
-@app.cell
+@app.cell(disabled=True)
 def _():
-    #  a = "2"
-    return
+    _a = "2"
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Qualite of life improvements: it's just python !!""")
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo, show_intro_nb):
-    mo.vstack(
-        [
-            mo.md(
-                """
-        For example, this is how this notebook starts...
-        """
-            ),
-            mo.md(
-                """
-    ```python
-    """
-                + " ".join(show_intro_nb())
-                + "```"
-            ),
-        ]
-    )
-    return
+    mo.md(show_intro_nb())
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""All cells are just function with a `@app.cell()` decorator.""")
-    return
+    mo.md(r"""All cells are just function with `app.cell()` decorator.""")
 
 
 @app.cell(hide_code=True)
@@ -135,12 +116,11 @@ def _(mo):
         r"""
         You can also just do:
 
-        `bash
+        ```bash
         python notebooks/mo_intro.py
-        `
+        ```
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -162,16 +142,16 @@ def _(mo):
 
     So let's rerun the notebook but in 'sandbox' mode:
 
-    `bash
+    ```bash
     marimo edit --sandbox notebooks/mo_intro.py
-    `
+    ```
 
     This will create a virtual environment with uv and installed the required dependencies.
 
-    `
+    ```
     Running in a sandbox: uv run --isolated --no-project --with-requirements /tmp/tmpu9dq4o5f.txt --refresh marimo edit mo_intro.py
     Installed 35 packages in 32ms
-    `
+    ```
 
     You will then be prompted to install any missing dependencies.
 
@@ -191,35 +171,27 @@ def _(mo, show_intro_nb):
         with toml-like definition of the dependencies of the notebook.
         """
             ),
-            mo.md(
-                """
-    ```python
-    """
-                + " ".join(show_intro_nb("@app"))
-                + "```"
-            ),
+            mo.md(show_intro_nb("@app")),
         ]
     )
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Cells can be tested !!!!""")
-    return
 
 
 @app.cell
 def function_to_test():
     def function_to_test(a):
         return a + 1
+
     return (function_to_test,)
 
 
 @app.cell
 def test_function(function_to_test):
     assert function_to_test(3) == 4
-    return
 
 
 @app.cell(hide_code=True)
@@ -228,7 +200,7 @@ def _(mo):
         r"""
         Name cells that contain a  test_..."test_..." and run pytest on your notebook.
 
-        `bash
+        ```bash
         $ pytest notebooks/mo_intro.py
 
         ================================================== test session starts ===================================================
@@ -243,10 +215,9 @@ def _(mo):
         mo_intro.py::test_function PASSED
 
         =================================================== 1 passed in 0.39s ====================================================
-        `
+        ```
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -262,13 +233,6 @@ def _(mo):
         ///
         """
     )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""More info in the [marimo documentation](https://docs.marimo.io/guides/testing/pytest/).""")
-    return
 
 
 @app.cell(hide_code=True)
@@ -280,34 +244,13 @@ def _(mo):
         Interactive table with easily accessible 'transform' operations.
         """
     )
-    return
 
 
 @app.cell
 def _(mo):
-    import json
-
-    data_file = mo.notebook_location() / ".." / "poia" / "tmp" / "nilearn_content.json"
-    with data_file.open("r") as f:
-        content = json.load(f)
-    return content, data_file, f, json
-
-
-@app.cell(disabled=True)
-def _(content):
     import pandas as pd
 
-    nilearn_repos = pd.DataFrame(content)
-
-    nilearn_repos["last_commit"] = pd.to_datetime(nilearn_repos["last_commit"])
-
-    nilearn_repos = nilearn_repos[
-        ~(nilearn_repos["extracted_version"].eq("several_versions_detected"))
-    ]
-
-    nilearn_repos["include"] = nilearn_repos["function_counts"].astype("bool", errors="ignore")
-
-    nilearn_repos
+    nilearn_repos = pd.read_csv(mo.notebook_location() / "public" / "nilearn_repos.csv")
     return nilearn_repos, pd
 
 
@@ -318,16 +261,9 @@ def _(mo, nilearn_repos):
     return (transformed_df,)
 
 
-@app.cell
-def _():
-    # nilearn_repos.groupby(["extracted_version"], dropna=True).count()
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""## Plotting""")
-    return
+    mo.md(r"""## Plotting and interactive UI""")
 
 
 @app.cell
@@ -349,6 +285,17 @@ def _(mo, nilearn_repos, plot_repos, radio):
         align="center",
     )
     return (repo_fig,)
+
+
+@app.cell
+def _():
+    from nilearn.datasets import load_sample_motor_activation_image
+    from nilearn.plotting import view_img
+
+    stat_map = load_sample_motor_activation_image()
+
+    view_img(stat_map, threshold=3)
+    return load_sample_motor_activation_image, stat_map, view_img
 
 
 @app.cell
@@ -387,7 +334,6 @@ def _(mo):
           for the notebook execution to continue.
         """
     )
-    return
 
 
 @app.cell(hide_code=True)
@@ -400,7 +346,6 @@ def _(mo):
         - deploy to github pages and other places
         """
     )
-    return
 
 
 @app.cell
@@ -416,31 +361,42 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Helper functions""")
-    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    def show_intro_nb(break_condition="def cell_2("):
-        with (mo.notebook_location() / "mo_intro.py").open("r") as f:
-            lines = f.readlines()
+    def show_intro_nb(break_condition: str = "def cell_2(") -> str:
+        try:
+            with (mo.notebook_location() / "mo_intro.py").open("r") as f:
+                lines = f.readlines()
+        except Exception:
+            return ""
 
         intro = []
         for l in lines:
             intro.append(l)
             if l.startswith(break_condition):
-                return intro
+                break
+        return (
+            f"""
+    {"`" * 3}python
+    """
+            + " ".join(intro)
+            + f"""
+    {"`" * 3}"""
+        )
+
     return (show_intro_nb,)
 
 
 @app.cell(hide_code=True)
-def _():
+def _(pd):
     import matplotlib.colors as mcolors
     import matplotlib.pyplot as plt
     import plotly.express as px
     from packaging.version import Version
 
-    def plot_repos(df, color=None):
+    def plot_repos(df: pd.DataFrame, color: str | None = None):
         if color == "":
             color = None
 
@@ -482,6 +438,7 @@ def _():
         fig.update_traces(xbins={"start": start_date, "end": end_date, "size": "M3"})
 
         return fig
+
     return Version, mcolors, plot_repos, plt, px
 
 

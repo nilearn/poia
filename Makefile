@@ -15,6 +15,13 @@ clean-so:
 	find . -name "*.pyd" | xargs rm -f
 
 clean-build:
-	rm -rf build
+	rm -fr build
+	rm -fr _site
 
 clean: clean-build clean-pyc clean-so
+
+build:
+	python scripts/build.py
+
+serve:
+	python -m http.server -d _site

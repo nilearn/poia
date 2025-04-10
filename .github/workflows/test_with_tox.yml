@@ -44,10 +44,3 @@ jobs:
         -   name: Run test suite
             run: |
                 tox run --list-dependencies -e test -- poia/poia.py
-
-        -   name: Upload coverage to CodeCov
-            uses: codecov/codecov-action@v5
-            with:
-                flags: ${{ matrix.os }}_${{ matrix.py }}
-                token: ${{ secrets.CODECOV_TOKEN }}
-            if: success()

@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
+#     "beautifulsoup4==4.13.3",
 #     "ipython==9.1.0",
 #     "marimo",
 #     "matplotlib==3.10.1",
@@ -20,7 +21,7 @@
 import marimo
 
 __generated_with = "0.12.0"
-app = marimo.App(width="full", app_title="POIA")
+app = marimo.App(width="medium", app_title="POIA")
 
 
 @app.cell(hide_code=True)
@@ -34,30 +35,82 @@ def _(config, mo):
 
         Will list repo that:
 
-        - contain {config["PACKAGE_OF_INTEREST"]} in one the common files
-          used to declare dependencies
-          (pyproject.toml, setup.cfg, requirements.txt...)
+        - are listed as dependents on the GitHub ∈sightsinsights tab of a repo
 
-        - import {config["PACKAGE_OF_INTEREST"]} in a python module or a ipython notebook.
+        - if that is not possible it will ping the GitHub API to find repos that:
+
+            - contain {config["PACKAGE_OF_INTEREST"]} in one the common files
+              used to declare dependencies
+              (pyproject.toml, setup.cfg, requirements.txt...)
+
+            - import {config["PACKAGE_OF_INTEREST"]} in a python module or a ipython notebook.
 
         Then it will clone those repos, collect and plot information about them.
         """
     )
+    return
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""## Search repos on github""")
+def _(config, mo):
+    mo.md(
+        f"""
+        ## Search repos for {config["PACKAGE_OF_INTEREST"]} on github
 
+        If you now the github pakcage where {config["PACKAGE_OF_INTEREST"]} is stored,
+        we'll try to scrap the github UI ∈sightsinsights tab of that repo
+        to get a list of dependentsdependents for {config["PACKAGE_OF_INTEREST"]}.
+        Results are saved in a dependents.jsondependents.json file.
 
-@app.cell
-def _(QUERIES, config, search_repositories):
-    repos = search_repositories(
-        queries=QUERIES,
-        config=config,
-        cache_file=config["CACHE"]["REPOSITORIES"],
+        If the repo of {config["PACKAGE_OF_INTEREST"]} is unknown
+        or no dependents.jsondependents.json is found or mentioned in the configuration,
+        then POIA will start pinging the GitHub API to search
+        where this {config["PACKAGE_OF_INTEREST"]} may be mentioned.
+        """
     )
-    return (repos,)
+    return
+
+
+@app.cell(disabled=True)
+def _(
+    QUERIES,
+    config,
+    get_dependents,
+    json,
+    logger,
+    search_repositories,
+    update_cache,
+):
+    dependents = None
+
+    dependents_file = (
+        config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["DEPENDENTS"]
+    )
+
+    repos = []
+
+    if dependents_file.exists():
+        with dependents_file.open("r") as f:
+            dependents = json.load(f)
+        repos = [f"https://github.com/{x}" for x in dependents]
+
+    elif config["PACKAGE_OF_INTEREST_REPO"]:
+        logger.info(f"Dependents file not found: {dependents_file}")
+        logger.info("Scrapping github for dependents...")
+        dependents = get_dependents("nilearn/nilearn")
+        update_cache(dependents_file, dependents)
+        repos = [f"https://github.com/{x}" for x in dependents]
+
+    else:
+        logger.info(f"'dependents' file not found: {dependents_file}")
+        logger.info(f"No known repo for: {config['PACKAGE_OF_INTEREST']}")
+        logger.info("Pipping github API to list repos...")
+        repos = search_repositories(
+            queries=QUERIES,
+            config=config,
+            cache_file=config["CACHE"]["REPOSITORIES"],
+        )
+    return dependents, dependents_file, f, repos
 
 
 @app.cell(hide_code=True)
@@ -93,14 +146,25 @@ def _(Path, config, mo, repos, shutil):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Cloning repos""")
+    return
 
 
 @app.cell(disabled=True)
-def clone_repositories(ThreadPoolExecutor, clone_repo, config, logger, repos):
+def clone_repositories(
+    ThreadPoolExecutor,
+    clone_repo,
+    config,
+    load_cache,
+    logger,
+    repos,
+):
+    ignore_list = load_cache(
+        config["CACHE"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']}_{config['CACHE']['IGNORE']}"
+    )
     with ThreadPoolExecutor(max_workers=config["N_JOBS"]) as executor:
-        executor.map(clone_repo, repos)
+        executor.map(clone_repo, [x for x in repos if x not in ignore_list])
     logger.info("Cloning done.")
-    return (executor,)
+    return executor, ignore_list
 
 
 @app.cell(hide_code=True)
@@ -112,32 +176,68 @@ def _(mo):
         Extract useful data from each repository and save them as a JSON to disk.
         """
     )
+    return
 
 
 @app.cell(disabled=True)
 def _(config, extract_data):
     extract_data(config)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""Load data from JSON.""")
+    return
 
 
 @app.cell
-def _(config, load_cache):
+def _(config, literal_eval, load_cache, mo, pd):
     content_cache_file = (
-        config["CACHE"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']}_{config['CACHE']['CONTENT']}"
+        config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["CONTENT"]
     )
-    data_projects = load_cache(content_cache_file)
-    return content_cache_file, data_projects
 
+    data_cache_file = (
+        config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["DATA"]
+    )
 
-@app.cell(hide_code=True)
-def _(config, mo):
+    if data_cache_file.exists():
+        data_poi = pd.read_csv(
+            data_cache_file,
+            na_values="n/a",
+            converters={
+                "versions": literal_eval,
+            },
+            parse_dates=["last_commit"],
+        )
+
+    else:
+        data_projects = load_cache(content_cache_file)
+
+        data_poi = pd.DataFrame(data_projects)
+
+        data_poi["last_commit"] = pd.to_datetime(data_poi["last_commit"])
+
+        data_poi["has_version"] = data_poi["extracted_version"].astype("bool", errors="ignore")
+        data_poi["has_imports"] = data_poi["import_counts"].astype("bool", errors="ignore")
+        data_poi["use_imports"] = data_poi["function_counts"].astype("bool", errors="ignore")
+        data_poi["include"] = (
+            data_poi["has_version"] | data_poi["has_imports"] | data_poi["use_imports"]
+        )
+
+        data_poi[["user", "repo"]] = data_poi["name"].str.split("/", expand=True)
+
+        data_poi["content"] = "mixed"
+        pure_notebook = (data_poi["n_notebook"] > 0) & (data_poi["n_python_file"] == 0)
+        pure_python = (data_poi["n_notebook"] == 0) & (data_poi["n_python_file"] > 0)
+        data_poi.loc[pure_notebook, "content"] = "notebook"
+        data_poi.loc[pure_python, "content"] = "python"
+
+        data_poi["duplicated_repo"] = data_poi["repo"].duplicated()
+
+        data_poi.fillna("n/a").to_csv(data_cache_file, index=False)
+
+    data_poi = data_poi[~(data_poi["extracted_version"].eq("several_versions_detected"))]
+
     mo.md(
         f"""
-        Do some data cleaning.
+        Load data from JSON or CSV.
+
+        If loading from JSON, do some data cleaning (see below) before saving to CSV.
 
         - for now drop the repos that apparently have several pinned versions
 
@@ -154,94 +254,70 @@ def _(config, mo):
           only python files, jupyter notebook or both.
         """
     )
-
-
-@app.cell
-def _(data_projects, pd):
-    data_projects_df = pd.DataFrame(data_projects)
-
-    data_projects_df["last_commit"] = pd.to_datetime(data_projects_df["last_commit"])
-
-    data_projects_df = data_projects_df[
-        ~(data_projects_df["extracted_version"].eq("several_versions_detected"))
-    ]
-
-    data_projects_df["has_version"] = data_projects_df["extracted_version"].astype(
-        "bool", errors="ignore"
+    return (
+        content_cache_file,
+        data_cache_file,
+        data_poi,
+        data_projects,
+        pure_notebook,
+        pure_python,
     )
-    data_projects_df["has_imports"] = data_projects_df["import_counts"].astype(
-        "bool", errors="ignore"
-    )
-    data_projects_df["use_imports"] = data_projects_df["function_counts"].astype(
-        "bool", errors="ignore"
-    )
-    data_projects_df["include"] = (
-        data_projects_df["has_version"]
-        | data_projects_df["has_imports"]
-        | data_projects_df["use_imports"]
-    )
-
-    data_projects_df[["user", "repo"]] = data_projects_df["name"].str.split("/", expand=True)
-
-    data_projects_df["content"] = "mixed"
-    pure_notebook = (data_projects_df["n_notebook"] > 0) & (data_projects_df["n_python_file"] == 0)
-    pure_python = (data_projects_df["n_notebook"] == 0) & (data_projects_df["n_python_file"] > 0)
-    data_projects_df.loc[pure_notebook, "content"] = "notebook"
-    data_projects_df.loc[pure_python, "content"] = "python"
-
-    data_projects_df["duplicated_repo"] = data_projects_df["repo"].duplicated()
-    return data_projects_df, pure_notebook, pure_python
 
 
 @app.cell(hide_code=True)
-def _(data_projects_df, mo):
+def _(data_poi, mo):
     mo.md(
         f"""
-        Found {len(data_projects_df)}
-        repositories. {data_projects_df["duplicated_repo"].sum()}
+        Found {len(data_poi)}
+        repositories. {data_poi["duplicated_repo"].sum()}
         of them seem to be duplicated.
         """
     )
+    return
 
 
 @app.cell
-def _(data_projects_df):
-    data_projects_df[data_projects_df["duplicated_repo"]][["user", "repo"]]
+def _(data_poi):
+    data_poi[data_poi["duplicated_repo"]][["user", "repo"]]
+    return
 
 
 @app.cell(hide_code=True)
-def _(data_projects_df, mo):
+def _(data_poi, mo):
     mo.md(
         f"""
-        {data_projects_df["include"].sum()}
+        {data_poi["include"].sum()}
         repositories are included in further analysis.
         """
     )
+    return
 
 
 @app.cell
-def _(data_projects_df):
-    data_projects_df[data_projects_df["include"]]
+def _(data_poi):
+    data_poi
+    return
 
 
 @app.cell
-def _(data_projects_df, mo):
-    transformed_df = mo.ui.dataframe(data_projects_df.drop(["versions"], axis=1))
-    # transformed_df
+def _(data_poi, mo):
+    transformed_df = mo.ui.dataframe(data_poi)
+    transformed_df
     return (transformed_df,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Plotting results""")
+    return
 
 
 @app.cell(hide_code=True)
-def _(config, data_projects_df, mo, px):
+def _(config, data_poi, mo, px):
     fig_content = px.histogram(
-        data_projects_df[data_projects_df["include"]],
+        data_poi[data_poi["include"]],
         x="content",
-        title=f"Content of {data_projects_df['include'].sum()} repositories",
+        title=f"Content of {data_poi['include'].sum()} repositories",
     )
 
     fig_content.show()
@@ -255,9 +331,9 @@ def _(config, data_projects_df, mo, px):
 
 
 @app.cell(hide_code=True)
-def _(config, data_projects_df, mo, plt, venn2):
-    as_dependency = data_projects_df["name"][data_projects_df["has_version"]].to_list()
-    actually_import = data_projects_df["name"][data_projects_df["has_imports"]].to_list()
+def _(config, data_poi, mo, plt, venn2):
+    as_dependency = data_poi["name"][data_poi["has_version"]].to_list()
+    actually_import = data_poi["name"][data_poi["has_imports"]].to_list()
     venn2(
         subsets=(
             set(as_dependency),
@@ -273,37 +349,30 @@ def _(config, data_projects_df, mo, plt, venn2):
         f"""
         Let's try to see how many repositories have
         the {config["PACKAGE_OF_INTEREST"]} as dependency but do not import it.
+
+        In many cases these repo may be using python 2
+        and their content may not have been parsed properly.
         """
     )
     return actually_import, as_dependency
 
 
+@app.cell
+def _(data_poi):
+    never_imported = data_poi[data_poi["include"] & ~data_poi["has_imports"]]
+    never_imported
+    return (never_imported,)
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Last commit date""")
-
-
-@app.cell
-def _(mo):
-    options = ["content", "extracted_version"]
-    radio = mo.ui.radio(options=options)
-    return options, radio
-
-
-@app.cell
-def _(radio):
-    explanation = ""
-    if radio.value == "extracted_version":
-        explanation = """
-    Version "0.0.0" is used here for cases when no version was pinned
-    or the exact version could not be determined.
-    """
-    return (explanation,)
+    return
 
 
 @app.cell(hide_code=True)
-def _(config, data_projects_df, explanation, mo, plot_repos, radio):
-    fig_repo = plot_repos(data_projects_df, color=radio.value)
+def _(config, data_poi, explanation_version_0, mo, plot_repos, radio):
+    fig_repo = plot_repos(data_poi, color=radio.value)
     fig_repo.show()
 
     mo.vstack(
@@ -311,7 +380,7 @@ def _(config, data_projects_df, explanation, mo, plot_repos, radio):
             mo.md(f"""
     Let's see how recently those repos were last updated
     split by what {radio.value} uses {config["PACKAGE_OF_INTEREST"]}.
-    {explanation}"""),
+    {explanation_version_0}"""),
             mo.hstack(
                 [
                     mo.vstack([mo.md("color"), radio]),
@@ -323,9 +392,31 @@ def _(config, data_projects_df, explanation, mo, plot_repos, radio):
     return (fig_repo,)
 
 
+@app.cell
+def _(config, explanation_version_0, mo, never_imported, plot_repos, radio):
+    fig_repo_unused = plot_repos(never_imported, color=radio.value)
+    fig_repo_unused.show()
+
+    mo.vstack(
+        [
+            mo.md(f"""
+    Same graph but for the repos that do not seem to use {config["PACKAGE_OF_INTEREST"]}
+    split by what {radio.value}.
+    {explanation_version_0}"""),
+            mo.hstack(
+                [
+                    mo.vstack([mo.md("color"), radio]),
+                ],
+                align="center",
+            ),
+        ]
+    )
+    return (fig_repo_unused,)
+
+
 @app.cell(hide_code=True)
-def _(data_projects_df, mo, plot_versions):
-    fig_version = plot_versions(data_projects_df)
+def _(data_poi, mo, plot_versions):
+    fig_version = plot_versions(data_poi)
     fig_version.show()
 
     mo.md("""
@@ -337,19 +428,18 @@ def _(data_projects_df, mo, plot_versions):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Subpackage use""")
+    return
 
 
 @app.cell
-def _(data_projects_df, extract_object_count):
-    import_df = extract_object_count(
-        data_projects_df[data_projects_df["has_imports"]], col="import_counts"
-    )
+def _(data_poi, extract_object_count):
+    import_df = extract_object_count(data_poi[data_poi["has_imports"]], col="import_counts")
     import_df
     return (import_df,)
 
 
 @app.cell(hide_code=True)
-def _(config, explanation, import_df, mo, plot_usage, radio):
+def _(config, explanation_version_0, import_df, mo, plot_usage, radio):
     subpackage_fig = plot_usage(import_df, color=radio.value)
     subpackage_fig.show()
 
@@ -358,7 +448,7 @@ def _(config, explanation, import_df, mo, plot_usage, radio):
             mo.md(f"""
     Analysis of which subpackage of {config["PACKAGE_OF_INTEREST"]}
     are used split by {radio.value}.
-    {explanation}
+    {explanation_version_0}
     """),
             mo.hstack(
                 [
@@ -372,10 +462,8 @@ def _(config, explanation, import_df, mo, plot_usage, radio):
 
 
 @app.cell
-def _(data_projects_df, extract_object_count):
-    function_df = extract_object_count(
-        data_projects_df[data_projects_df["use_imports"]], col="function_counts"
-    )
+def _(data_poi, extract_object_count):
+    function_df = extract_object_count(data_poi[data_poi["use_imports"]], col="function_counts")
     function_df
     return (function_df,)
 
@@ -404,11 +492,13 @@ def _(config, function_df, mo, plot_usage, radio):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Helper functions""")
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Logging""")
+    return
 
 
 @app.cell
@@ -435,6 +525,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Plotting""")
+    return
 
 
 @app.cell
@@ -554,6 +645,7 @@ def _(Version, px):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### AST parsing""")
+    return
 
 
 @app.cell(hide_code=True)
@@ -651,6 +743,7 @@ def _(ast, warnings):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Github repo search""")
+    return
 
 
 @app.cell(hide_code=True)
@@ -743,8 +836,67 @@ def _(Path, call_api, load_cache, logger, update_cache):
 
 
 @app.cell
+def _(BeautifulSoup, collections, logger, requests):
+    def get_dependents(repo_of_interest):
+        """Scrap github insights-dependency graph to find dependents."""
+        dependents = set()
+
+        for type in ["PACKAGE", "REPOSITORY"]:
+            logger.info(f"Finding dependent {type.lower()} for {repo_of_interest}...")
+
+            url = f"https://github.com/{repo_of_interest}/network/dependents?dependent_type={type}"
+
+            nextExists = True
+            while nextExists:
+                logger.debug(url)
+
+                r = requests.get(url)
+
+                soup = BeautifulSoup(r.content, "html.parser")
+
+                for t in soup.find_all("div", {"class": "Box-row"}):
+                    user = t.find("a", {"data-hovercard-type": "user"})
+                    repo = t.find("a", {"data-hovercard-type": "repository"})
+                    if not user:
+                        user = t.find("a", {"data-hovercard-type": "organization"})
+
+                    if not user:
+                        img = t.find("img", {"alt": "@ghost"})
+                        if img:
+                            logger.debug("ghost account")
+                            continue
+                        else:
+                            logger.warning("unknown div")
+                            logger.warning(f"{t}")
+
+                    dependents.add(f"{user.text}/{repo.text}")
+
+                nextExists = False
+                if not soup.find("div", {"class": "paginate-container"}):
+                    nextExists = True
+                    continue
+                for u in soup.find("div", {"class": "paginate-container"}).find_all("a"):
+                    if u.text == "Next":
+                        nextExists = True
+                        url = u["href"]
+
+        dependents = sorted(dependents)
+
+        repo_names = set(x.split("/")[1] for x in dependents)
+        duplicates = [item for item, count in collections.Counter(repo_names).items() if count > 1]
+        if duplicates:
+            logger.info("Contain repos with same names: probably forks?")
+            logger.info(duplicates)
+
+        return dependents
+
+    return (get_dependents,)
+
+
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Cloning""")
+    return
 
 
 @app.cell
@@ -777,6 +929,7 @@ def _(Path, config, logger, os, subprocess):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### IO""")
+    return
 
 
 @app.cell(hide_code=True)
@@ -813,7 +966,32 @@ def _load_cache(Path, json):
 
 @app.cell(hide_code=True)
 def _(mo):
+    mo.md(r"""### UI""")
+    return
+
+
+@app.cell
+def _(mo):
+    options = {"content": "content", "version": "extracted_version", "None": None}
+    radio = mo.ui.radio(options=options)
+    return options, radio
+
+
+@app.cell
+def _(radio):
+    explanation_version_0 = ""
+    if radio.value == "extracted_version":
+        explanation_version_0 = """
+    Version "0.0.0" is used here for cases when no version was pinned
+    or the exact version could not be determined.
+    """
+    return (explanation_version_0,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
     mo.md(r"""### Data extraction""")
+    return
 
 
 @app.cell
@@ -824,6 +1002,8 @@ def _(pd):
         for x in df.iterrows():
             if x[1][col] is None:
                 continue
+            if isinstance(x[1][col], str):
+                x[1][col] = eval(x[1][col])
             for module, n in x[1][col].items():
                 object_list.append(
                     {
@@ -841,21 +1021,15 @@ def _(pd):
 
 @app.cell
 def _(
-    NotJSONError,
-    PythonExporter,
-    count_functions,
-    count_imports,
+    extract_data_repo,
     get_last_commit_date,
     get_version,
     json,
     load_cache,
     logger,
-    nbformat,
     shutil,
 ):
     def extract_data(config):
-        exporter = PythonExporter()
-
         ignore_list = load_cache(
             config["CACHE"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']}_{config['CACHE']['IGNORE']}"
         )
@@ -895,72 +1069,7 @@ def _(
 
                 versions, extracted_version = get_version(directory=d, config=config)
 
-                import_counts = {}
-                class_counts = {}
-                n_python_file = 0
-                n_notebook = 0
-
-                for ext in config["EXTENSIONS"]:
-                    pat = f"**/*.{ext}"
-                    for py_file in d.glob(pat):
-                        if any(
-                            part in config["EXCLUDED_DIRS"]
-                            for part in py_file.relative_to(config["CACHE"]["DIR"]).parts
-                        ):
-                            logger.debug(f"File in excluded dir : {py_file.relative_to(d)}")
-                            continue
-
-                        try:
-                            with py_file.open("r") as f:
-                                if py_file.suffix == ".py":
-                                    content = f.read()
-                                else:
-                                    notebook_node = nbformat.read(f, as_version=4)
-                                    content, _ = exporter.from_notebook_node(notebook_node)
-                        except UnicodeDecodeError:
-                            logger.error(f"\tCould not decode file: {py_file.relative_to(d)}")
-                            continue
-                        except NotJSONError:
-                            logger.error(
-                                f"\tNotebook does not appear to be JSON: {py_file.relative_to(d)}"
-                            )
-                            continue
-                        except Exception:
-                            logger.error(f"\tError when reading: {py_file.relative_to(d)}")
-                            continue
-
-                        if config["PACKAGE_OF_INTEREST"] not in content:
-                            logger.debug(
-                                f"\t{config['PACKAGE_OF_INTEREST']} not in file: "
-                                f"{py_file.relative_to(d)}"
-                            )
-                            continue
-
-                        found_imports = count_imports(content, config)
-                        if not found_imports:
-                            logger.debug(f"\tNo import of POI in file: {py_file.relative_to(d)}")
-                            continue
-                        if isinstance(found_imports, Exception):
-                            logger.error(f"\tError parsing content: {py_file.relative_to(d)}")
-                            continue
-
-                        for k, v in found_imports.items():
-                            if k not in import_counts:
-                                import_counts[k] = v
-                            else:
-                                import_counts[k] += v
-
-                        found_classes = count_functions(content, config)
-                        for k, v in found_classes.items():
-                            if k not in class_counts:
-                                class_counts[k] = v
-                            else:
-                                class_counts[k] += v
-
-                        if py_file.suffix == ".py":
-                            n_python_file += 1
-                        else:
-                            n_notebook += 1
+                data_this_repo = extract_data_repo(repo_path=d, config=config)
 
                 data_projects.append(
                     {
@@ -968,10 +1077,7 @@ def _(
                         "last_commit": last_commit,
                         "versions": versions,
                         "extracted_version": extracted_version,
-                        "import_counts": import_counts or None,
-                        "function_counts": class_counts or None,
-                        "n_python_file": n_python_file,
-                        "n_notebook": n_notebook,
+                        **data_this_repo,
                     }
                 )
 
@@ -982,6 +1088,107 @@ def _(
         logger.info("Data extraction done.")
 
     return (extract_data,)
+
+
+@app.cell
+def _(
+    NotJSONError,
+    Path,
+    PythonExporter,
+    count_functions,
+    count_imports,
+    logger,
+    nbformat,
+):
+    def extract_data_repo(repo_path: Path, config):
+        exporter = PythonExporter()
+        import_counts = {}
+        class_counts = {}
+        n_python_file = 0
+        n_notebook = 0
+
+        for ext in config["EXTENSIONS"]:
+            pat = f"**/*.{ext}"
+            for py_file in repo_path.glob(pat):
+                if any(
+                    part in config["EXCLUDED_DIRS"]
+                    for part in py_file.relative_to(config["CACHE"]["DIR"]).parts
+                ):
+                    logger.debug(f"File in excluded dir : {py_file.relative_to(repo_path)}")
+                    continue
+
+                try:
+                    with py_file.open("r") as f:
+                        if py_file.suffix == ".py":
+                            content = f.read()
+                        else:
+                            notebook_node = nbformat.read(f, as_version=4)
+                            content, _ = exporter.from_notebook_node(notebook_node)
+                except UnicodeDecodeError:
+                    logger.error(f"\tCould not decode file: {py_file.relative_to(repo_path)}")
+                    continue
+                except NotJSONError:
+                    logger.error(
+                        f"\tNotebook does not appear to be JSON: {py_file.relative_to(repo_path)}"
+                    )
+                    continue
+                except Exception:
+                    logger.error(f"\tError when reading: {py_file.relative_to(repo_path)}")
+                    continue
+
+                if config["PACKAGE_OF_INTEREST"] not in content:
+                    logger.debug(
+                        f"\t{config['PACKAGE_OF_INTEREST']} not in file: "
+                        f"{py_file.relative_to(repo_path)}"
+                    )
+                    continue
+
+                found_imports = count_imports(content, config)
+                if not found_imports:
+                    logger.debug(f"\tNo import of POI in file: {py_file.relative_to(repo_path)}")
+                    continue
+                if isinstance(found_imports, SyntaxError):
+                    logger.error(f"\tError parsing content: {py_file.relative_to(repo_path)}")
+                    if "Missing parentheses in call to 'print'." in found_imports.msg:
+                        logger.error("\tthis seems to be a python<3 file")
+                    continue
+                if isinstance(found_imports, Exception):
+                    logger.error(f"\tError parsing content: {py_file.relative_to(repo_path)}")
+                    continue
+
+                for k, v in found_imports.items():
+                    if k not in import_counts:
+                        import_counts[k] = v
+                    else:
+                        import_counts[k] += v
+
+                found_classes = count_functions(content, config)
+                for k, v in found_classes.items():
+                    if k not in class_counts:
+                        class_counts[k] = v
+                    else:
+                        class_counts[k] += v
+
+                if py_file.suffix == ".py":
+                    n_python_file += 1
+                else:
+                    n_notebook += 1
+
+        return {
+            "n_notebook": n_notebook,
+            "n_python_file": n_python_file,
+            "import_counts": import_counts,
+            "class_counts": class_counts,
+        }
+
+    return (extract_data_repo,)
+
+
+@app.cell
+def test_extract_data_repo(config, extract_data_repo):
+    data_this_repo = repo_to_test = config["CACHE"]["DIR"] / "poldrack" / "myconnectome"
+    extract_data_repo(repo_path=repo_to_test, config=config)
+    return data_this_repo, repo_to_test
 
 
 @app.cell(hide_code=True)
@@ -1017,6 +1224,7 @@ def _(Path, logger, subprocess):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""### Version handling""")
+    return
 
 
 @app.cell(hide_code=True)
@@ -1096,6 +1304,8 @@ def _(re):
 def test_extract_version(extract_version):
     assert extract_version("") == "0.0.0"
     assert extract_version("nilearn==0.1") == "0.1"
+    assert extract_version("nilearn><1.0") == "1.0"
+    return
 
 
 @app.cell(hide_code=True)
@@ -1179,17 +1389,24 @@ def _(configparser, print):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Configuration""")
+    return
 
 
 @app.cell
-def _set_config(GITHUB_TOKEN, Path, __file__):
+def _set_config(GITHUB_TOKEN, Path, mo):
     config: dict[str, bool | dict[str, Path | bool | str | int | dict[str, str]]] = {
         "PACKAGE_OF_INTEREST": "nilearn",
-        "CACHE": {
-            "DIR": Path(__file__).parent / "tmp",
+        "PACKAGE_OF_INTEREST_REPO": "nilearn/nilearn",
+        "OUTPUT": {
+            "DIR": mo.notebook_dir() / "public",
+            "DEPENDENTS": "dependents.json",  # repositories found by github-dependents-info
             "REPOSITORIES": "repositories.json",  # repositories to investigate
             "CONTENT": "content.json",  # content found
+            "DATA": "content.tsv",  # content cleaned
             "IGNORE": "ignore.json",  # repositories to ignore
+        },
+        "CACHE": {
+            "DIR": mo.notebook_dir() / "tmp",
             "REFRESH": False,
         },
         "LOCKFILES": [
@@ -1238,9 +1455,10 @@ def _(config, itertools):
     return (QUERIES,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Imports""")
+    return
 
 
 @app.cell
@@ -1248,6 +1466,7 @@ def _():
     import argparse
     import ast
     import base64
+    import collections
     import configparser
     import itertools
     import json
@@ -1258,6 +1477,7 @@ def _():
     import sys
     import time
     import warnings
+    from ast import literal_eval
     from concurrent.futures import ThreadPoolExecutor
     from pathlib import Path
     from urllib.parse import quote
@@ -1272,6 +1492,7 @@ def _():
     import plotly.express as px
     import requests
     import toml
+    from bs4 import BeautifulSoup
     from marimo import md
     from matplotlib import cm
     from matplotlib_venn import venn2
@@ -1281,6 +1502,7 @@ def _():
     from rich import print
 
     return (
+        BeautifulSoup,
         IPython,
         NotJSONError,
         Path,
@@ -1291,9 +1513,11 @@ def _():
         ast,
         base64,
         cm,
+        collections,
         configparser,
         itertools,
         json,
+        literal_eval,
         mcolors,
         md,
         mo,
@@ -1317,9 +1541,10 @@ def _():
     )
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""## Globals""")
+    return
 
 
 @app.cell

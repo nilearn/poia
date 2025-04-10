@@ -20,8 +20,5 @@ clean-build:
 
 clean: clean-build clean-pyc clean-so
 
-build:
-	python scripts/build.py
-
 serve:
 	python -m http.server -d _site

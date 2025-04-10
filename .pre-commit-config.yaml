@@ -57,5 +57,5 @@ repos:
     hooks:
     -   id: mypy
         files: poia
-        additional_dependencies: [types-tqdm, types-toml, types-requests, pandas-stubs]
+        additional_dependencies: [types-tqdm, types-toml, types-requests, pandas-stubs, types-beautifulsoup4]
         args: [--config-file, pyproject.toml, --pretty]

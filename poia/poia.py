@@ -301,20 +301,24 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(config, data_poi, mo, px):
+def _(config, mo):
+    mo.md(f"""
+    Content of repositories distinguishing those
+    using {config["PACKAGE_OF_INTEREST"]}
+    in notebooks, python files or both.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(data_poi, px):
     fig_content = px.histogram(
         data_poi[data_poi["include"]],
         x="content",
         title=f"Content of {data_poi['include'].sum()} repositories",
     )
 
-    fig_content.show()
-
-    mo.md(f"""
-    Content of repositories distinguishing those
-    using {config["PACKAGE_OF_INTEREST"]}
-    in notebooks, python files or both.
-    """)
+    fig_content
     return (fig_content,)
 
 
@@ -405,7 +409,7 @@ def _(
 
 
 @app.cell(hide_code=True)
-def _(data_poi, mo, plot_versions):
+def version_used(data_poi, mo, plot_versions):
     fig_version = plot_versions(data_poi)
     fig_version.show()
 
@@ -468,6 +472,7 @@ def _(mo):
 @app.cell
 def _(data_poi, extract_object_count):
     function_df = extract_object_count(data_poi[data_poi["use_imports"]], col="function_counts")
+    function_df.to_csv("functions_used.csv", index=False)
     function_df
     return (function_df,)
 
@@ -522,7 +527,6 @@ def _():
         )
 
         return logging.getLogger("cohort_creator")
-
     return RichHandler, logging, poia_logger
 
 
@@ -572,7 +576,6 @@ def _(Version, mcolors, plt, px):
         fig.update_layout(xaxis_title=col, yaxis_title="Usage Count")
 
         return fig
-
     return (plot_usage,)
 
 
@@ -619,7 +622,6 @@ def plot_repos(Version, mcolors, plt, px):
         fig.update_traces(xbins={"start": start_date, "end": end_date, "size": bin_size})
 
         return fig
-
     return (plot_repos,)
 
 
@@ -644,7 +646,6 @@ def _(Version, px):
         )
         fig.update_layout(xaxis_title="Version", yaxis_title="Repository Count")
         return fig
-
     return (plot_versions,)
 
 
@@ -706,7 +707,6 @@ def _(ast, warnings):
                         import_counts[submodule] = import_counts.get(submodule, 0) + 1
 
         return import_counts
-
     return (count_imports,)
 
 
@@ -774,7 +774,6 @@ def _(ast, count_imports, warnings):
         function_counts = {k: v for k, v in function_counts.items() if k not in imports}
 
         return function_counts
-
     return (count_functions,)
 
 
@@ -820,7 +819,6 @@ def _(logger, requests, time):
         time.sleep(config["GITHUB_API"]["SLEEP_TIME"])
 
         return response
-
     return call_api, quote
 
 
@@ -881,7 +879,6 @@ def _(Path, call_api, load_cache, logger, update_cache):
         logger.info("Done.")
 
         return list(repo_urls)
-
     return (search_repositories,)
 
 
@@ -941,7 +938,6 @@ def _(collections, logger, requests):
             logger.info(duplicates)
 
         return dependents
-
     return BeautifulSoup, get_dependents
 
 
@@ -974,7 +970,6 @@ def _(Path, config, logger, os, subprocess):
             logger.info(f"Cloned: {url}")
         except subprocess.CalledProcessError:
             logger.error(f"Failed to clone: {url}")
-
     return (clone_repo,)
 
 
@@ -1000,7 +995,6 @@ def _update_cache(Path, json, load_cache, logger):
                 logger.error("TypeError: unhashable type: 'dict'")
         with cache_file.open("w") as f:
             json.dump(cache, f, indent=2)
-
     return (update_cache,)
 
 
@@ -1012,7 +1006,6 @@ def _load_cache(Path, json):
             with cache_file.open("r") as f:
                 return json.load(f)
         return []
-
     return (load_cache,)
 
 
@@ -1113,7 +1106,6 @@ def _(pd):
                     }
                 )
         return pd.DataFrame(object_list)
-
     return (extract_object_count,)
 
 
@@ -1190,7 +1182,6 @@ def _(
                 bar.update()
 
         logger.info("Data extraction done.")
-
     return (extract_data,)
 
 
@@ -1296,7 +1287,6 @@ def _(Path, count_functions, count_imports, find_files_with_string, logger):
             "function_counts": function_counts,
             "contains_python_2": contains_python_2,
         }
-
     return NotJSONError, PythonExporter, extract_data_repo, nbformat
 
 
@@ -1332,7 +1322,6 @@ def _(logger, subprocess):
             else:
                 logger.error("An error occurred")
                 return []
-
     return (find_files_with_string,)
 
 
@@ -1369,7 +1358,6 @@ def _(Path, logger, subprocess):
         except subprocess.CalledProcessError as e:
             logger.error(f"Error: {e}")
             return None
-
     return (get_last_commit_date,)
 
 
@@ -1428,7 +1416,6 @@ def _(
             extracted_version = next(iter(set(tmp)))
 
         return versions, extracted_version
-
     return (get_version,)
 
 
@@ -1446,7 +1433,6 @@ def _(re):
             if match:
                 return match.group(1)
         return "0.0.0"
-
     return (extract_version,)
 
 
@@ -1497,7 +1483,6 @@ def _(Path, print):
         except Exception as e:
             print(f"Error reading pyproject.toml: {e}")
             return None
-
     return get_version_from_pyproject, toml
 
 
@@ -1534,7 +1519,6 @@ def _(configparser, print):
         except Exception as e:
             print(f"Error reading setup.cfg: {e}")
             return None
-
     return (get_version_from_setup_cfg,)
 
 
@@ -1644,7 +1628,6 @@ def _():
     from matplotlib_venn import venn2
     from packaging.version import Version
     from rich import print
-
     return (
         Path,
         Version,

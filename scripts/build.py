@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+"""Build notebooks for deployment."""
 
 import argparse
-import os
 import subprocess
 from pathlib import Path
 
@@ -20,10 +20,10 @@ def export_html_wasm(notebook_path: str, output_dir: str) -> bool:
     cmd.extend(["--mode", "edit"])
 
     try:
-        output_file = os.path.join(output_dir, output_path)
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        output_file = Path(output_dir) / output_path
+        output_file.parent.mkdir(exist_ok=True)
 
-        cmd.extend([notebook_path, "-o", output_file])
+        cmd.extend([notebook_path, "-o", str(output_file)])
         subprocess.run(cmd, capture_output=True, text=True, check=True)
         return True
     except subprocess.CalledProcessError as e:
@@ -39,11 +39,11 @@ def generate_index(all_notebooks: list[str], output_dir: str) -> None:
     """Generate the index.html file."""
     print("Generating index.html")
 
-    index_path = os.path.join(output_dir, "index.html")
-    os.makedirs(output_dir, exist_ok=True)
+    index_path = Path(output_dir) / "index.html"
+    index_path.parent.mkdir(exist_ok=True)
 
     try:
-        with open(index_path, "w") as f:
+        with index_path.open("w") as f:
             f.write(
                 """<!DOCTYPE html>
 <html lang="en">

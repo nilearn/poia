@@ -50,7 +50,7 @@ Homepage = "https://www.github.com/Remi-Gau/poia"
 
 [tool.codespell]
 builtin = "clear,rare,en-GB_to_en-US"
-skip = "./.git,*.cff,*/tmp,.mypy_cache,env,venv"
+skip = "./.git,*.cff,*/tmp,.mypy_cache,env,venv,poia/public/**/*"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "poia/_version.py"

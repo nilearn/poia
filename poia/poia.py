@@ -57,7 +57,7 @@ def _(config, mo):
         f"""
         ## Search repos for {config["PACKAGE_OF_INTEREST"]} on github
 
-        If you now the github pakcage where {config["PACKAGE_OF_INTEREST"]} is stored,
+        If you now the github package where {config["PACKAGE_OF_INTEREST"]} is stored,
         we'll try to scrap the github UI ∈sightsinsights tab of that repo
         to get a list of dependentsdependents for {config["PACKAGE_OF_INTEREST"]}.
         Results are saved in a dependents.jsondependents.json file.
@@ -71,7 +71,7 @@ def _(config, mo):
     return
 
 
-@app.cell(disabled=True)
+@app.cell
 def _(
     QUERIES,
     config,
@@ -159,7 +159,7 @@ def clone_repositories(
     repos,
 ):
     ignore_list = load_cache(
-        config["CACHE"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']}_{config['CACHE']['IGNORE']}"
+        config["OUTPUT"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']} / {config['OUTPUT']['IGNORE']}"
     )
     with ThreadPoolExecutor(max_workers=config["N_JOBS"]) as executor:
         executor.map(clone_repo, [x for x in repos if x not in ignore_list])
@@ -167,7 +167,7 @@ def clone_repositories(
     return executor, ignore_list
 
 
-@app.cell(hide_code=True)
+@app.cell(disabled=True, hide_code=True)
 def _(mo):
     mo.md(
         r"""
@@ -179,13 +179,13 @@ def _(mo):
     return
 
 
-@app.cell(disabled=True)
+@app.cell
 def _(config, extract_data):
     extract_data(config)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(config, literal_eval, load_cache, mo, pd):
     content_cache_file = (
         config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["CONTENT"]
@@ -282,17 +282,6 @@ def _(data_poi):
     return
 
 
-@app.cell(hide_code=True)
-def _(data_poi, mo):
-    mo.md(
-        f"""
-        {data_poi["include"].sum()}
-        repositories are included in further analysis.
-        """
-    )
-    return
-
-
 @app.cell
 def _(data_poi):
     data_poi
@@ -330,6 +319,15 @@ def _(config, data_poi, mo, px):
     return (fig_content,)
 
 
+@app.cell
+def _(data_poi, mo, px):
+    plot = mo.ui.plotly(
+        px.scatter(data_poi, x="n_python_file", y="n_notebook", width=800, height=600)
+    )
+    plot
+    return (plot,)
+
+
 @app.cell(hide_code=True)
 def _(config, data_poi, mo, plt, venn2):
     as_dependency = data_poi["name"][data_poi["has_version"]].to_list()
@@ -359,7 +357,7 @@ def _(config, data_poi, mo, plt, venn2):
 
 @app.cell
 def _(data_poi):
-    never_imported = data_poi[data_poi["include"] & ~data_poi["has_imports"]]
+    never_imported = data_poi[(data_poi["include"]) & (~data_poi["has_imports"])]
     never_imported
     return (never_imported,)
 
@@ -371,47 +369,40 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(config, data_poi, explanation_version_0, mo, plot_repos, radio):
-    fig_repo = plot_repos(data_poi, color=radio.value)
+def _(
+    config,
+    data_poi,
+    explanation_version_0,
+    mo,
+    plot_repos,
+    radio_color,
+    radio_color_element,
+    radio_include,
+    radio_include_element,
+    radio_timebin,
+    radio_timebin_element,
+):
+    fig_repo = plot_repos(
+        data_poi,
+        color=radio_color.value,
+        bin_size=radio_timebin.value,
+        include_mask=radio_include.value,
+    )
     fig_repo.show()
 
     mo.vstack(
         [
             mo.md(f"""
     Let's see how recently those repos were last updated
-    split by what {radio.value} uses {config["PACKAGE_OF_INTEREST"]}.
+    split by what {radio_color.value} uses {config["PACKAGE_OF_INTEREST"]}.
     {explanation_version_0}"""),
             mo.hstack(
-                [
-                    mo.vstack([mo.md("color"), radio]),
-                ],
+                [radio_color_element, radio_timebin_element, radio_include_element, mo.vstack([])],
                 align="center",
             ),
         ]
     )
     return (fig_repo,)
-
-
-@app.cell
-def _(config, explanation_version_0, mo, never_imported, plot_repos, radio):
-    fig_repo_unused = plot_repos(never_imported, color=radio.value)
-    fig_repo_unused.show()
-
-    mo.vstack(
-        [
-            mo.md(f"""
-    Same graph but for the repos that do not seem to use {config["PACKAGE_OF_INTEREST"]}
-    split by what {radio.value}.
-    {explanation_version_0}"""),
-            mo.hstack(
-                [
-                    mo.vstack([mo.md("color"), radio]),
-                ],
-                align="center",
-            ),
-        ]
-    )
-    return (fig_repo_unused,)
 
 
 @app.cell(hide_code=True)
@@ -439,26 +430,40 @@ def _(data_poi, extract_object_count):
 
 
 @app.cell(hide_code=True)
-def _(config, explanation_version_0, import_df, mo, plot_usage, radio):
-    subpackage_fig = plot_usage(import_df, color=radio.value)
+def _(
+    config,
+    explanation_version_0,
+    import_df,
+    mo,
+    plot_usage,
+    radio_color,
+    radio_color_element,
+):
+    subpackage_fig = plot_usage(import_df, color=radio_color.value)
     subpackage_fig.show()
 
     mo.vstack(
         [
             mo.md(f"""
     Analysis of which subpackage of {config["PACKAGE_OF_INTEREST"]}
-    are used split by {radio.value}.
+    are used split by {radio_color.value}.
     {explanation_version_0}
     """),
             mo.hstack(
                 [
-                    mo.vstack([mo.md("color"), radio]),
+                    radio_color_element,
                 ],
                 align="center",
             ),
         ],
     )
     return (subpackage_fig,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""### Function / Class use""")
+    return
 
 
 @app.cell
@@ -469,18 +474,18 @@ def _(data_poi, extract_object_count):
 
 
 @app.cell(hide_code=True)
-def _(config, function_df, mo, plot_usage, radio):
-    function_fig = plot_usage(function_df, color=radio.value)
+def _(config, function_df, mo, plot_usage, radio_color, radio_color_element):
+    function_fig = plot_usage(function_df, color=radio_color.value)
     function_fig.show()
     mo.vstack(
         [
             mo.md(f"""
     Analysis of which class / functions of {config["PACKAGE_OF_INTEREST"]}
-    are used split by {radio.value}.
+    are used split by {radio_color.value}.
     """),
             mo.hstack(
                 [
-                    mo.vstack([mo.md("color"), radio]),
+                    radio_color_element,
                 ],
                 align="center",
             ),
@@ -528,7 +533,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Version, mcolors, plt, px):
     def plot_usage(df, color=None):
         """Plot how frequently subpackage, classes, functions are used."""
@@ -548,7 +553,7 @@ def _(Version, mcolors, plt, px):
                 color_map = [mcolors.to_hex(cmap(i)) for i in range(len(ordered_versions))]
 
         # Aggregate and sort modules by total count
-        order = df.groupby(col)["n"].sum().sort_values(ascending=False).index.tolist()
+        order = df.groupby(col)["n"].count().sort_values(ascending=False).index.tolist()
         category_orders = {col: order}
 
         if color:
@@ -572,11 +577,13 @@ def _(Version, mcolors, plt, px):
     return (plot_usage,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def plot_repos(Version, mcolors, plt, px):
-    def plot_repos(df, color=None):
+    def plot_repos(df, color=None, bin_size="M3", include_mask=None):
         df.drop_duplicates(subset=["name"])
-        df = df[df["include"]]
+
+        if include_mask is not None:
+            df = df[include_mask]
 
         category_orders = None
         color_map = None
@@ -610,14 +617,14 @@ def plot_repos(Version, mcolors, plt, px):
         fig.update_xaxes(tickformat="%Y-%m")
 
         # Update the x-axis bin size to 3 months
-        fig.update_traces(xbins={"start": start_date, "end": end_date, "size": "M3"})
+        fig.update_traces(xbins={"start": start_date, "end": end_date, "size": bin_size})
 
         return fig
 
     return (plot_repos,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Version, px):
     def plot_versions(df):
         df = df[df["include"]]
@@ -646,6 +653,24 @@ def _(Version, px):
 def _(mo):
     mo.md(r"""### AST parsing""")
     return
+
+
+@app.cell(hide_code=True)
+def _():
+    dummy_file = """
+    import nilearn
+    import nilearn.plotting
+    from nilearn import plotting
+    from nilearn.plotting import plot_img
+    from nilearn.maskers.nifti_masker import NiftiMasker
+
+    plot_img(x)
+    plotting.plot_img(x)
+    plotting.view_img(x)
+
+    NiftiMasker()
+    """
+    return (dummy_file,)
 
 
 @app.cell(hide_code=True)
@@ -687,8 +712,18 @@ def _(ast, warnings):
 
 
 @app.cell(hide_code=True)
-def _(ast, warnings):
-    def count_functions(content, config):
+def test_count_imports(config, count_imports, dummy_file):
+    expected_count_imports = {"plotting": 3, "maskers": 1}
+    actual_count_imports = count_imports(dummy_file, config)
+    assert actual_count_imports == expected_count_imports, (
+        f"{actual_count_imports=} {expected_count_imports=}"
+    )
+    return actual_count_imports, expected_count_imports
+
+
+@app.cell(hide_code=True)
+def _(ast, count_imports, warnings):
+    def count_functions(content, config, imports=None):
         """Count usage of classes / functions from the package of interest in a Python file."""
         with warnings.catch_warnings():
             warnings.filterwarnings(action="ignore", category=SyntaxWarning)
@@ -698,7 +733,7 @@ def _(ast, warnings):
                 return e
 
         package = config["PACKAGE_OF_INTEREST"]
-        class_usage = {}
+        function_counts = {}
         alias_map = {}  # Maps alias to full import path
 
         # First pass: build a map of imported names and their sources
@@ -722,7 +757,7 @@ def _(ast, warnings):
                     full_ref = alias_map.get(value.id)
                     if full_ref and full_ref.startswith(package):
                         class_name = node.attr
-                        class_usage[class_name] = class_usage.get(class_name, 0) + 1
+                        function_counts[class_name] = function_counts.get(class_name, 0) + 1
                 self.generic_visit(node)
 
             def visit_Name(self, node):
@@ -730,14 +765,28 @@ def _(ast, warnings):
                 if full_ref and full_ref.startswith(package):
                     # Handle direct usage of imported class
                     class_name = full_ref.split(".")[-1]
-                    class_usage[class_name] = class_usage.get(class_name, 0) + 1
+                    function_counts[class_name] = function_counts.get(class_name, 0) + 1
                 self.generic_visit(node)
 
         ClassVisitor().visit(tree)
 
-        return class_usage
+        if imports is None:
+            imports = count_imports(content, config)
+        function_counts = {k: v for k, v in function_counts.items() if k not in imports}
+
+        return function_counts
 
     return (count_functions,)
+
+
+@app.cell(hide_code=True)
+def test_count_functions(config, count_functions, dummy_file):
+    expected_count_functions = {"plot_img": 2, "view_img": 1, "NiftiMasker": 1}
+    actual_count_functions = count_functions(dummy_file, config)
+    assert actual_count_functions == expected_count_functions, (
+        f"{actual_count_functions=} {expected_count_functions=}"
+    )
+    return actual_count_functions, expected_count_functions
 
 
 @app.cell(hide_code=True)
@@ -835,7 +884,7 @@ def _(Path, call_api, load_cache, logger, update_cache):
     return (search_repositories,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(BeautifulSoup, collections, logger, requests):
     def get_dependents(repo_of_interest):
         """Scrap github insights-dependency graph to find dependents."""
@@ -882,7 +931,7 @@ def _(BeautifulSoup, collections, logger, requests):
 
         dependents = sorted(dependents)
 
-        repo_names = set(x.split("/")[1] for x in dependents)
+        repo_names = {x.split("/")[1] for x in dependents}
         duplicates = [item for item, count in collections.Counter(repo_names).items() if count > 1]
         if duplicates:
             logger.info("Contain repos with same names: probably forks?")
@@ -899,7 +948,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Path, config, logger, os, subprocess):
     def clone_repo(url):
         url_path = Path(url)
@@ -972,15 +1021,61 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    options = {"content": "content", "version": "extracted_version", "None": None}
-    radio = mo.ui.radio(options=options)
-    return options, radio
+    radio_color = mo.ui.radio(
+        options={"None": None, "content": "content", "version": "extracted_version"}
+    )
+    return (radio_color,)
 
 
 @app.cell
-def _(radio):
+def _(mo, radio_color):
+    radio_color_element = mo.vstack([mo.md("Color"), radio_color])
+    return (radio_color_element,)
+
+
+@app.cell
+def _(mo):
+    radio_timebin = mo.ui.radio(
+        options={"1 month": "M1", "3 months": "M3", "6 months": "M6"}, value="3 months"
+    )
+    return (radio_timebin,)
+
+
+@app.cell
+def _(mo, radio_timebin):
+    radio_timebin_element = mo.vstack([mo.md("Time bin"), radio_timebin])
+    return (radio_timebin_element,)
+
+
+@app.cell
+def _(config, data_poi, mo):
+    radio_include = mo.ui.radio(
+        options={
+            "All": None,
+            f"mention version {config['PACKAGE_OF_INTEREST']}": data_poi["has_version"],
+            f"import {config['PACKAGE_OF_INTEREST']}": data_poi["use_imports"],
+            f"mention version of but does not import {config['PACKAGE_OF_INTEREST']}": (
+                data_poi["has_version"]
+            )
+            & (~data_poi["use_imports"]),
+            f"mention version and import {config['PACKAGE_OF_INTEREST']}": (data_poi["has_version"])
+            & (data_poi["use_imports"]),
+        },
+        value="All",
+    )
+    return (radio_include,)
+
+
+@app.cell
+def _(mo, radio_include):
+    radio_include_element = mo.vstack([mo.md("Include"), radio_include])
+    return (radio_include_element,)
+
+
+@app.cell
+def _(radio_color):
     explanation_version_0 = ""
-    if radio.value == "extracted_version":
+    if radio_color.value == "extracted_version":
         explanation_version_0 = """
     Version "0.0.0" is used here for cases when no version was pinned
     or the exact version could not be determined.
@@ -994,7 +1089,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(pd):
     def extract_object_count(df, col):
         """Extract sub dataframe for count of modules / classes / functions."""
@@ -1027,30 +1122,33 @@ def _(
     json,
     load_cache,
     logger,
+    mo,
     shutil,
 ):
     def extract_data(config):
         ignore_list = load_cache(
-            config["CACHE"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']}_{config['CACHE']['IGNORE']}"
+            config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["IGNORE"]
         )
 
         content_cache_file = (
-            config["CACHE"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']}_{config['CACHE']['CONTENT']}"
+            config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["CONTENT"]
         )
 
         data_projects = load_cache(content_cache_file)
         repo_already_done = {x["name"] for x in data_projects}
 
+        all_repos = []
         for user in config["CACHE"]["DIR"].iterdir():
-            if not user.is_dir():
-                continue
+            if user.is_dir():
+                all_repos.extend(list(user.iterdir()))
 
-            for d in user.iterdir():
+        with mo.status.progress_bar(total=len(all_repos)) as bar:
+            for d in all_repos:
                 if not d.is_dir() or not (d / ".git").exists():
                     logger.error(f"{d} is not a git repo.")
                     continue
 
-                repo_full_name = f"{user.name}/{d.name}"
+                repo_full_name = f"{d.parent.name}/{d.name}"
                 logger.info(f"{repo_full_name}")
 
                 if f"https://github.com/{repo_full_name}" in ignore_list:
@@ -1085,35 +1183,50 @@ def _(
                     json.dump(data_projects, f, indent=2)
 
                 logger.info("\tDONE")
+
+                bar.update()
+
         logger.info("Data extraction done.")
 
     return (extract_data,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     NotJSONError,
     Path,
     PythonExporter,
     count_functions,
     count_imports,
+    find_files_with_string,
     logger,
     nbformat,
 ):
     def extract_data_repo(repo_path: Path, config):
         exporter = PythonExporter()
-        import_counts = {}
-        class_counts = {}
+
+        import_counts: dict[str, int] = {}
+        function_counts: dict[str, int] = {}
         n_python_file = 0
         n_notebook = 0
+        contains_python_2 = False
+
+        if not repo_path.exists():
+            return {
+                "n_notebook": n_notebook,
+                "n_python_file": n_python_file,
+                "import_counts": import_counts,
+                "function_counts": function_counts,
+                "contains_python_2": contains_python_2,
+            }
 
         for ext in config["EXTENSIONS"]:
-            pat = f"**/*.{ext}"
-            for py_file in repo_path.glob(pat):
-                if any(
-                    part in config["EXCLUDED_DIRS"]
-                    for part in py_file.relative_to(config["CACHE"]["DIR"]).parts
-                ):
+            files = find_files_with_string(repo_path, config, pattern=f"*.{ext}")
+
+            for py_file in files:
+                py_file = Path(py_file)
+
+                if any(part in config["EXCLUDED_DIRS"] for part in py_file.parts):
                     logger.debug(f"File in excluded dir : {py_file.relative_to(repo_path)}")
                     continue
 
@@ -1148,12 +1261,16 @@ def _(
                     logger.debug(f"\tNo import of POI in file: {py_file.relative_to(repo_path)}")
                     continue
                 if isinstance(found_imports, SyntaxError):
-                    logger.error(f"\tError parsing content: {py_file.relative_to(repo_path)}")
                     if "Missing parentheses in call to 'print'." in found_imports.msg:
+                        contains_python_2 = True
                         logger.error("\tthis seems to be a python<3 file")
+                    else:
+                        logger.error(f"\tError parsing content: {py_file.relative_to(repo_path)}")
+                        logger.error(f"\t\t {found_imports.msg}")
                     continue
                 if isinstance(found_imports, Exception):
                     logger.error(f"\tError parsing content: {py_file.relative_to(repo_path)}")
+                    logger.error(f"\t\t {found_imports.msg}")
                     continue
 
                 for k, v in found_imports.items():
@@ -1164,10 +1281,10 @@ def _(
 
                 found_classes = count_functions(content, config)
                 for k, v in found_classes.items():
-                    if k not in class_counts:
-                        class_counts[k] = v
+                    if k not in function_counts:
+                        function_counts[k] = v
                     else:
-                        class_counts[k] += v
+                        function_counts[k] += v
 
                 if py_file.suffix == ".py":
                     n_python_file += 1
@@ -1178,13 +1295,50 @@ def _(
             "n_notebook": n_notebook,
             "n_python_file": n_python_file,
             "import_counts": import_counts,
-            "class_counts": class_counts,
+            "function_counts": function_counts,
+            "contains_python_2": contains_python_2,
         }
 
     return (extract_data_repo,)
 
 
-@app.cell
+@app.cell(hide_code=True)
+def _(logger, subprocess):
+    def find_files_with_string(search_dir, config, pattern="*.py"):
+        command = [
+            "grep",
+            "-rl",
+            f"--include={pattern}",
+            config["PACKAGE_OF_INTEREST"],
+            str(search_dir),
+        ]
+
+        try:
+            result = subprocess.run(
+                command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+
+            if not result.stdout:
+                return []
+
+            files = [x for x in result.stdout.split("\n") if x != ""]
+            logger.info(
+                f"\t{len(files)} {pattern} files containing {config['PACKAGE_OF_INTEREST']}"
+            )
+            return files
+
+        except subprocess.CalledProcessError as e:
+            # grep returns exit code 1 if no matches are found
+            if e.returncode == 1:
+                return []
+            else:
+                logger.error("An error occurred")
+                return []
+
+    return (find_files_with_string,)
+
+
+@app.cell(hide_code=True)
 def test_extract_data_repo(config, extract_data_repo):
     data_this_repo = repo_to_test = config["CACHE"]["DIR"] / "poldrack" / "myconnectome"
     extract_data_repo(repo_path=repo_to_test, config=config)
@@ -1267,22 +1421,20 @@ def _(
                     }
                 )
 
-        extracted_version = [
-            x["extracted_version"] for x in versions if x["extracted_version"] is not None
-        ]
-        if not extracted_version:
+        tmp = [x["extracted_version"] for x in versions if x["extracted_version"] is not None]
+        if not tmp:
             extracted_version = None
-        elif len(set(extracted_version)) > 1:
+        elif len(set(tmp)) > 1:
             extracted_version = "several_versions_detected"
         else:
-            extracted_version = next(iter(set(extracted_version)))
+            extracted_version = next(iter(set(tmp)))
 
         return versions, extracted_version
 
     return (get_version,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(re):
     def extract_version(version):
         """Extract actual version from a string.
@@ -1300,7 +1452,7 @@ def _(re):
     return (extract_version,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def test_extract_version(extract_version):
     assert extract_version("") == "0.0.0"
     assert extract_version("nilearn==0.1") == "0.1"

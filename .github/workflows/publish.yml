@@ -33,7 +33,7 @@ jobs:
 
         -   name: 🛠️ Export notebooks
             run: |
-                python scripts/build.py
+                marimo export html-wasm --mode edit poia/poia.py -o _site/notebooks/poia.html
 
         -   name: 📤 Upload artifact
             uses: actions/upload-pages-artifact@v3

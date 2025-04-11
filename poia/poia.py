@@ -20,7 +20,7 @@
 
 import marimo
 
-__generated_with = "0.12.0"
+__generated_with = "0.12.8"
 app = marimo.App(width="medium", app_title="POIA")
 
 
@@ -71,7 +71,7 @@ def _(config, mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     QUERIES,
     config,
@@ -150,21 +150,16 @@ def _(mo):
 
 
 @app.cell(disabled=True)
-def clone_repositories(
-    ThreadPoolExecutor,
-    clone_repo,
-    config,
-    load_cache,
-    logger,
-    repos,
-):
+def clone_repositories(clone_repo, config, load_cache, logger, repos):
+    from concurrent.futures import ThreadPoolExecutor
+
     ignore_list = load_cache(
         config["OUTPUT"]["DIR"] / f"{config['PACKAGE_OF_INTEREST']} / {config['OUTPUT']['IGNORE']}"
     )
     with ThreadPoolExecutor(max_workers=config["N_JOBS"]) as executor:
         executor.map(clone_repo, [x for x in repos if x not in ignore_list])
     logger.info("Cloning done.")
-    return executor, ignore_list
+    return ThreadPoolExecutor, executor, ignore_list
 
 
 @app.cell(disabled=True, hide_code=True)
@@ -179,23 +174,21 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(disabled=True, hide_code=True)
 def _(config, extract_data):
     extract_data(config)
     return
 
 
-@app.cell(hide_code=True)
-def _(config, literal_eval, load_cache, mo, pd):
+@app.cell
+def _(config, literal_eval, load_cache, logger, mo, pd):
     content_cache_file = (
         config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["CONTENT"]
     )
 
-    data_cache_file = (
-        config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["DATA"]
-    )
+    data_cache_file = mo.notebook_location() / config["OUTPUT"]["DIR"] / config["OUTPUT"]["DATA"]
 
-    if data_cache_file.exists():
+    try:
         data_poi = pd.read_csv(
             data_cache_file,
             na_values="n/a",
@@ -205,7 +198,13 @@ def _(config, literal_eval, load_cache, mo, pd):
             parse_dates=["last_commit"],
         )
 
-    else:
+        logger.info(f"File {data_cache_file} loaded.")
+
+    except Exception as e:
+        logger.error(repr(e))
+        logger.error(f"Could not load {data_cache_file}")
+        logger.error(f"Trying to to creata datadframe from {content_cache_file}")
+
         data_projects = load_cache(content_cache_file)
 
         data_poi = pd.DataFrame(data_projects)
@@ -796,7 +795,9 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(logger, quote, requests, time):
+def _(logger, requests, time):
+    from urllib.parse import quote
+
     def call_api(query: str, page: int, config):
         """Wrap github API call and response handling."""
         url = config["GITHUB_API"]["SEARCH"].format(query=quote(query), page=page)
@@ -820,7 +821,7 @@ def _(logger, quote, requests, time):
 
         return response
 
-    return (call_api,)
+    return call_api, quote
 
 
 @app.cell(hide_code=True)
@@ -885,7 +886,9 @@ def _(Path, call_api, load_cache, logger, update_cache):
 
 
 @app.cell(hide_code=True)
-def _(BeautifulSoup, collections, logger, requests):
+def _(collections, logger, requests):
+    from bs4 import BeautifulSoup
+
     def get_dependents(repo_of_interest):
         """Scrap github insights-dependency graph to find dependents."""
         dependents = set()
@@ -939,7 +942,7 @@ def _(BeautifulSoup, collections, logger, requests):
 
         return dependents
 
-    return (get_dependents,)
+    return BeautifulSoup, get_dependents
 
 
 @app.cell(hide_code=True)
@@ -1114,7 +1117,7 @@ def _(pd):
     return (extract_object_count,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     extract_data_repo,
     get_last_commit_date,
@@ -1192,16 +1195,11 @@ def _(
 
 
 @app.cell(hide_code=True)
-def _(
-    NotJSONError,
-    Path,
-    PythonExporter,
-    count_functions,
-    count_imports,
-    find_files_with_string,
-    logger,
-    nbformat,
-):
+def _(Path, count_functions, count_imports, find_files_with_string, logger):
+    import nbformat
+    from nbconvert import PythonExporter
+    from nbformat.reader import NotJSONError
+
     def extract_data_repo(repo_path: Path, config):
         exporter = PythonExporter()
 
@@ -1299,7 +1297,7 @@ def _(
             "contains_python_2": contains_python_2,
         }
 
-    return (extract_data_repo,)
+    return NotJSONError, PythonExporter, extract_data_repo, nbformat
 
 
 @app.cell(hide_code=True)
@@ -1461,7 +1459,9 @@ def test_extract_version(extract_version):
 
 
 @app.cell(hide_code=True)
-def _(Path, print, toml):
+def _(Path, print):
+    import toml
+
     def get_version_from_pyproject(pyproject_path: Path, config) -> str | None:
         """Extract version of POI from pyproject.toml."""
         default = "0.0.0"
@@ -1498,7 +1498,7 @@ def _(Path, print, toml):
             print(f"Error reading pyproject.toml: {e}")
             return None
 
-    return (get_version_from_pyproject,)
+    return get_version_from_pyproject, toml
 
 
 @app.cell(hide_code=True)
@@ -1630,36 +1630,23 @@ def _():
     import time
     import warnings
     from ast import literal_eval
-    from concurrent.futures import ThreadPoolExecutor
     from pathlib import Path
-    from urllib.parse import quote
 
-    import IPython
     import marimo as mo
     import matplotlib as mpl
     import matplotlib.colors as mcolors
     import matplotlib.pyplot as plt
-    import nbformat
     import pandas as pd
     import plotly.express as px
     import requests
-    import toml
-    from bs4 import BeautifulSoup
     from marimo import md
     from matplotlib import cm
     from matplotlib_venn import venn2
-    from nbconvert import PythonExporter
-    from nbformat.reader import NotJSONError
     from packaging.version import Version
     from rich import print
 
     return (
-        BeautifulSoup,
-        IPython,
-        NotJSONError,
         Path,
-        PythonExporter,
-        ThreadPoolExecutor,
         Version,
         argparse,
         ast,
@@ -1674,20 +1661,17 @@ def _():
         md,
         mo,
         mpl,
-        nbformat,
         os,
         pd,
         plt,
         print,
         px,
-        quote,
         re,
         requests,
         shutil,
         subprocess,
         sys,
         time,
-        toml,
         venn2,
         warnings,
     )

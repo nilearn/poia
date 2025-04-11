@@ -432,6 +432,22 @@ def _(data_poi, extract_object_count):
     return (import_df,)
 
 
+@app.cell
+def _(import_df):
+    import_df_counts = import_df['object'].value_counts().reset_index()
+    import_df_counts.columns = ['object', 'count']
+    import_df_counts
+    return (import_df_counts,)
+
+
+@app.cell
+def _(import_df):
+    import_df_weighted = import_df.groupby('object', as_index=False)['n'].sum().sort_values('n', ascending=False)
+    import_df_weighted.columns = ['object', 'weighted_count']
+    import_df_weighted
+    return (import_df_weighted,)
+
+
 @app.cell(hide_code=True)
 def _(
     config,
@@ -441,8 +457,10 @@ def _(
     plot_usage,
     radio_color,
     radio_color_element,
+    switch,
+    switch_weigthed_element,
 ):
-    subpackage_fig = plot_usage(import_df, color=radio_color.value)
+    subpackage_fig = plot_usage(import_df, color=radio_color.value, weighted=switch.value)
     subpackage_fig.show()
 
     mo.vstack(
@@ -455,6 +473,8 @@ def _(
             mo.hstack(
                 [
                     radio_color_element,
+                    switch_weigthed_element,
+                    mo.vstack([])
                 ],
                 align="center",
             ),
@@ -470,16 +490,41 @@ def _(mo):
 
 
 @app.cell
-def _(data_poi, extract_object_count):
+def _(config, data_poi, extract_object_count):
     function_df = extract_object_count(data_poi[data_poi["use_imports"]], col="function_counts")
-    function_df.to_csv("functions_used.csv", index=False)
+    function_df.to_csv(config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / "functions_used.csv", index=False)
     function_df
     return (function_df,)
 
 
+@app.cell
+def _(function_df):
+    function_df_counts = function_df['object'].value_counts().reset_index()
+    function_df_counts.columns = ['object', 'count']
+    function_df_counts
+    return (function_df_counts,)
+
+
+@app.cell
+def _(function_df):
+    function_df_weighted = function_df.groupby('object', as_index=False)['n'].sum().sort_values('n', ascending=False)
+    function_df_weighted.columns = ['object', 'weighted_count']
+    function_df_weighted
+    return (function_df_weighted,)
+
+
 @app.cell(hide_code=True)
-def _(config, function_df, mo, plot_usage, radio_color, radio_color_element):
-    function_fig = plot_usage(function_df, color=radio_color.value)
+def _(
+    config,
+    function_df,
+    mo,
+    plot_usage,
+    radio_color,
+    radio_color_element,
+    switch,
+    switch_weigthed_element,
+):
+    function_fig = plot_usage(function_df, color=radio_color.value, weighted=switch.value)
     function_fig.show()
     mo.vstack(
         [
@@ -490,6 +535,8 @@ def _(config, function_df, mo, plot_usage, radio_color, radio_color_element):
             mo.hstack(
                 [
                     radio_color_element,
+                    switch_weigthed_element,
+                    mo.vstack([])
                 ],
                 align="center",
             ),
@@ -536,18 +583,26 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(Version, mcolors, plt, px):
-    def plot_usage(df, color=None):
+@app.cell
+def plot_usage(Version, mcolors, plt, px):
+    def plot_usage(df, color=None, weighted=False):
         """Plot how frequently subpackage, classes, functions are used."""
         col = "object"
+        y = None
+
+        if weighted:
+            group_by = ["name", col, color] if color is not None else ["name", col]
+            df = (
+            df.groupby(group_by, as_index=False)['n'].sum()
+        )
+            df = df.sort_values('n', ascending=False)
+            y = "n"
 
         color_map = None
         if color:
             df = df.dropna(subset=[color])
 
             # Sort version labels naturally
-            category_orders = {color: sorted(df[color].unique())}
             if color == "extracted_version":
                 ordered_versions = sorted(df[color].unique(), key=Version)
 
@@ -557,8 +612,9 @@ def _(Version, mcolors, plt, px):
 
         # Aggregate and sort modules by total count
         order = df.groupby(col)["n"].count().sort_values(ascending=False).index.tolist()
+        if weighted:
+            order = df.groupby(col)["n"].sum().sort_values(ascending=False).index.tolist()
         category_orders = {col: order}
-
         if color:
             category_orders[color] = (
                 ordered_versions if color == "extracted_version" else sorted(df[color].unique())
@@ -567,6 +623,7 @@ def _(Version, mcolors, plt, px):
         fig = px.histogram(
             df,
             x=col,
+            y=y,
             title=f"Analysis of {len(df['name'].unique())} repositories",
             category_orders=category_orders,
             color_discrete_sequence=color_map,
@@ -1066,6 +1123,18 @@ def _(config, data_poi, mo):
 def _(mo, radio_include):
     radio_include_element = mo.vstack([mo.md("Include"), radio_include])
     return (radio_include_element,)
+
+
+@app.cell
+def _(mo):
+    switch = mo.ui.switch()
+    return (switch,)
+
+
+@app.cell
+def _(mo, switch):
+    switch_weigthed_element = mo.vstack([mo.md("Weighted"), switch])
+    return (switch_weigthed_element,)
 
 
 @app.cell

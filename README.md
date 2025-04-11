@@ -1,7 +1,12 @@
 # Package of interest auditor
 
-Investigate how a package is used on
+Investigate how a python package is used by 'crawling' through github repositories.
 
-marimo export html-wasm --mode edit poia/poia.py -o _site/notebooks/poia.html
+Currently contain results for nilearn.
 
-python -m http.server --directory _site/notebooks
+To launch and interact with notebooks.
+
+```bash
+pip install marimo
+marimo edit --sandbox poia/poia.py
+```

@@ -20,5 +20,8 @@ clean-build:
 
 clean: clean-build clean-pyc clean-so
 
+build: clean
+	marimo export html-wasm --mode edit poia/poia.py -o _site/notebooks/poia.html
+
 serve:
-	python -m http.server -d _site
+	python -m http.server --directory _site/notebooks

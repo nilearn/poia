@@ -98,7 +98,7 @@ def _(
         elif config["PACKAGE_OF_INTEREST_REPO"]:
             logger.info(f"Dependents file not found: {dependents_file}")
             logger.info("Scrapping github for dependents...")
-            dependents = get_dependents("nilearn/nilearn")
+            dependents = get_dependents(config["PACKAGE_OF_INTEREST_REPO"])
             update_cache(dependents_file, dependents)
 
         repos = [f"https://github.com/{x}" for x in dependents]
@@ -194,13 +194,14 @@ def _(mo):
 
 @app.cell
 def _(config, extract_data):
-    extract_data(config)
-    return
+    content_cache_file = extract_data(config)
+    return (content_cache_file,)
 
 
 @app.cell
 def _(
     config,
+    content_cache_file,
     get_extracted_version,
     get_lock_file,
     literal_eval,
@@ -209,10 +210,6 @@ def _(
     mo,
     pd,
 ):
-    content_cache_file = (
-        config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["CONTENT"]
-    )
-
     data_cache_file = mo.notebook_location() / config["OUTPUT"]["DATA"]
 
     try:
@@ -288,14 +285,7 @@ def _(
           only python files, jupyter notebook or both.
         """
     )
-    return (
-        content_cache_file,
-        data_cache_file,
-        data_poi,
-        data_projects,
-        pure_notebook,
-        pure_python,
-    )
+    return data_cache_file, data_poi, data_projects, pure_notebook, pure_python
 
 
 @app.cell(hide_code=True)
@@ -458,14 +448,6 @@ def _(data_poi):
     return (never_imported,)
 
 
-@app.cell
-def _(data_poi, print):
-    for row in data_poi.iterrows():
-        if row[1]["versions"]:
-            print(row[1]["versions"])
-    return (row,)
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""#### Lockfile used""")
@@ -477,7 +459,6 @@ def _(config, data_poi, mo, px, radio_include, radio_include_element):
     def plot_lockfiles(df, include_mask=None):
         if include_mask is not None:
             df = df[include_mask]
-        df = df[~(df["extracted_version"].eq("several_versions_detected"))]
         df = df.drop_duplicates(subset=["name"])
 
         fig = px.histogram(
@@ -565,8 +546,8 @@ def _(mo):
 
 
 @app.cell
-def _(data_poi, extract_object_count):
-    import_df = extract_object_count(data_poi[data_poi["has_imports"]], col="import_counts")
+def _(config, data_poi, extract_object_count):
+    import_df = extract_object_count(data_poi[data_poi["has_imports"]], col="import_counts", config=config)
     import_df
     return (import_df,)
 
@@ -628,7 +609,7 @@ def _(mo):
 
 @app.cell
 def _(config, data_poi, extract_object_count):
-    function_df = extract_object_count(data_poi[data_poi["use_imports"]], col="function_counts")
+    function_df = extract_object_count(data_poi[data_poi["use_imports"]], col="function_counts", config=config)
     function_df.to_csv(
         config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / "functions_used.csv", index=False
     )
@@ -711,7 +692,6 @@ def _():
         )
 
         return logging.getLogger("cohort_creator")
-
     return RichHandler, logging, poia_logger
 
 
@@ -771,7 +751,6 @@ def plot_usage(Version, mcolors, plt, px):
         fig.update_layout(xaxis_title=col, yaxis_title="Usage Count")
 
         return fig
-
     return (plot_usage,)
 
 
@@ -820,7 +799,6 @@ def plot_repos(Version, mcolors, plt, px):
         fig.update_traces(xbins={"start": start_date, "end": end_date, "size": bin_size})
 
         return fig
-
     return (plot_repos,)
 
 
@@ -846,7 +824,6 @@ def _(Version, px):
         )
         fig.update_layout(xaxis_title="Version", yaxis_title="Repository Count")
         return fig
-
     return (plot_versions,)
 
 
@@ -908,7 +885,6 @@ def _(ast, warnings):
                         import_counts[submodule] = import_counts.get(submodule, 0) + 1
 
         return import_counts
-
     return (count_imports,)
 
 
@@ -976,7 +952,6 @@ def _(ast, count_imports, warnings):
         function_counts = {k: v for k, v in function_counts.items() if k not in imports}
 
         return function_counts
-
     return (count_functions,)
 
 
@@ -1022,7 +997,6 @@ def _(logger, requests, time):
         time.sleep(config["GITHUB_API"]["SLEEP_TIME"])
 
         return response
-
     return call_api, quote
 
 
@@ -1081,7 +1055,6 @@ def _(Path, call_api, load_cache, logger, update_cache):
         logger.info("Done.")
 
         return list(repo_urls)
-
     return (search_repositories,)
 
 
@@ -1141,7 +1114,6 @@ def _(collections, logger, requests):
             logger.info(duplicates)
 
         return dependents
-
     return BeautifulSoup, get_dependents
 
 
@@ -1174,7 +1146,6 @@ def _(Path, config, logger, os, subprocess):
             logger.info(f"Cloned: {url}")
         except subprocess.CalledProcessError:
             logger.error(f"Failed to clone: {url}")
-
     return (clone_repo,)
 
 
@@ -1200,7 +1171,6 @@ def _update_cache(Path, json, load_cache, logger):
                 logger.error("TypeError: unhashable type: 'dict'")
         with cache_file.open("w") as f:
             json.dump(cache, f, indent=2)
-
     return (update_cache,)
 
 
@@ -1212,7 +1182,6 @@ def _load_cache(Path, json):
             with cache_file.open("r") as f:
                 return json.load(f)
         return []
-
     return (load_cache,)
 
 
@@ -1328,7 +1297,7 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(pd):
-    def extract_object_count(df, col):
+    def extract_object_count(df, col, config):
         """Extract sub dataframe for count of modules / classes / functions."""
         object_list = []
         for x in df.iterrows():
@@ -1337,7 +1306,7 @@ def _(pd):
             if isinstance(x[1][col], str):
                 x[1][col] = eval(x[1][col])
             for object, n in x[1][col].items():
-                if object == "nilearn":
+                if object == config["PACKAGE_OF_INTEREST"]:
                     continue
                 object_list.append(
                     {
@@ -1349,7 +1318,6 @@ def _(pd):
                     }
                 )
         return pd.DataFrame(object_list)
-
     return (extract_object_count,)
 
 
@@ -1430,6 +1398,7 @@ def _(
 
         logger.info("Data extraction done.")
 
+        return content_cache_file
     return (extract_data,)
 
 
@@ -1548,7 +1517,6 @@ def _(Path, count_functions, count_imports, find_files_with_string, logger):
             "function_counts": function_counts,
             "contains_python_2": contains_python_2,
         }
-
     return NotJSONError, PythonExporter, extract_data_repo, nbformat
 
 
@@ -1581,7 +1549,6 @@ def _(logger, subprocess):
             else:
                 logger.error("An error occurred")
                 return []
-
     return (find_files_with_string,)
 
 
@@ -1618,7 +1585,6 @@ def _(Path, logger, subprocess):
         except subprocess.CalledProcessError as e:
             logger.error(f"Error: {e}")
             return None
-
     return (get_last_commit_date,)
 
 
@@ -1675,7 +1641,6 @@ def _(
                 )
 
         return versions
-
     return (get_version,)
 
 
@@ -1689,21 +1654,19 @@ def get_extracted_version():
             return "several_versions_detected"
         else:
             return next(iter(set(tmp)))
-
     return (get_extracted_version,)
 
 
 @app.cell
 def _(Path):
     def get_lock_file(version_list):
-        tmp = [Path(x["file"]).name for x in version_list]
+        tmp = [Path(x["file"]).name for x in version_list if x["extracted_version"] is not None]
         if not tmp:
             return None
         elif len(set(tmp)) > 1:
             return "several_lockfile_detected"
         else:
             return next(iter(set(tmp)))
-
     return (get_lock_file,)
 
 
@@ -1721,7 +1684,6 @@ def _(re):
             if match:
                 return match.group(1)
         return "0.0.0"
-
     return (extract_version,)
 
 
@@ -1772,7 +1734,6 @@ def _(Path, print):
         except Exception as e:
             print(f"Error reading pyproject.toml: {e}")
             return None
-
     return get_version_from_pyproject, toml
 
 
@@ -1809,7 +1770,6 @@ def _(configparser, print):
         except Exception as e:
             print(f"Error reading setup.cfg: {e}")
             return None
-
     return (get_version_from_setup_cfg,)
 
 
@@ -1840,12 +1800,11 @@ def _(Path, ast, logger):
         visitor = SetupVisitor()
         visitor.visit(tree)
 
-        # Print dependencies and check for nilearn
+        # Print dependencies and check for POI
         for dep in visitor.install_requires:
             if config["PACKAGE_OF_INTEREST"] in dep:
                 return dep
         return None
-
     return (get_version_from_setup_py,)
 
 
@@ -1885,21 +1844,23 @@ def _set_config(GITHUB_TOKEN, Path, mo):
         ],
         "DEBUG": False,
         "EXCLUDED_DIRS": {
-            ".venv",
-            "env",
-            "venv",
-            "ENV",
-            "env.bak",
-            "venv.bak",
+            "__pycache__",
             ".ipynb_checkpoints",
+            ".env",
+            ".venv",
+            "ENV",
+            "env",
+            "env.bak",
+            "venv",
+            "venv.bak",
+            "build",
+            "dist",
             "doc",
             "docs",
             "externals",
             "lib",
             "Lib",
-            "__pycache__",
-            "build",
-            "dist",
+            "wandb",
         },
         "EXTENSIONS": [
             "ipynb",
@@ -1968,10 +1929,8 @@ def _():
     import requests
     from marimo import md
     from matplotlib import cm
-    from matplotlib_venn import venn2
     from packaging.version import Version
     from rich import print
-
     return (
         Path,
         Version,
@@ -1999,7 +1958,6 @@ def _():
         subprocess,
         sys,
         time,
-        venn2,
         warnings,
     )
 

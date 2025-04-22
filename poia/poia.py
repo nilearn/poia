@@ -83,9 +83,7 @@ def _(
 ):
     dependents = None
 
-    dependents_file = (
-        config["OUTPUT"]["DIR"] / config["OUTPUT"]["DEPENDENTS"]
-    )
+    dependents_file = config["OUTPUT"]["DIR"] / config["OUTPUT"]["DEPENDENTS"]
 
     repos = []
 
@@ -98,27 +96,23 @@ def _(
         dependents = get_dependents(config["PACKAGE_OF_INTEREST_REPO"])
 
     if dependents:
-    
         update_cache(dependents_file, dependents)
-    
+
         repos = [f"https://github.com/{x}" for x in dependents]
 
-        repo_url_cache_file = (
-            config["OUTPUT"]["DIR"]
-            / config["OUTPUT"]["REPOSITORIES"]
-        )
+        repo_url_cache_file = config["OUTPUT"]["DIR"] / config["OUTPUT"]["REPOSITORIES"]
         extra_repos = load_cache(repo_url_cache_file)
         if extra_repos:
             logger.info("Adding repos grabbed from github API...")
             repos.extend(extra_repos)
-        
+
         repos = list(set(repos))
 
     else:
         logger.info(f"'dependents' file not found: {dependents_file}")
         logger.info(f"No known repo for: {config['PACKAGE_OF_INTEREST']}")
         logger.info("Pinging github API to list repos...")
-    
+
         repos = search_repositories(
             queries=QUERIES,
             config=config,
@@ -222,9 +216,7 @@ def _(config, content_cache_file, get_lock_file, load_cache, mo, pd):
     data_poi[["user", "repo"]] = data_poi["name"].str.split("/", expand=True)
 
     data_poi["content"] = "mixed"
-    pure_notebook = (data_poi["n_notebook_parsed"] > 0) & (
-        data_poi["n_python_file_parsed"] == 0
-    )
+    pure_notebook = (data_poi["n_notebook_parsed"] > 0) & (data_poi["n_python_file_parsed"] == 0)
     pure_python = (data_poi["n_notebook_parsed"] == 0) & (data_poi["n_python_file_parsed"] > 0)
     data_poi.loc[pure_notebook, "content"] = "notebook"
     data_poi.loc[pure_python, "content"] = "python"
@@ -519,7 +511,9 @@ def _(mo):
 
 @app.cell
 def _(config, data_poi, extract_object_count):
-    import_df = extract_object_count(data_poi[data_poi["has_imports"]], col="import_counts", config=config)
+    import_df = extract_object_count(
+        data_poi[data_poi["has_imports"]], col="import_counts", config=config
+    )
     import_df
     return (import_df,)
 
@@ -581,10 +575,10 @@ def _(mo):
 
 @app.cell
 def _(config, data_poi, extract_object_count):
-    function_df = extract_object_count(data_poi[data_poi["use_imports"]], col="function_counts", config=config)
-    function_df.to_csv(
-        config["OUTPUT"]["DIR"] / "functions_used.csv", index=False
+    function_df = extract_object_count(
+        data_poi[data_poi["use_imports"]], col="function_counts", config=config
     )
+    function_df.to_csv(config["OUTPUT"]["DIR"] / "functions_used.csv", index=False)
     function_df
     return (function_df,)
 
@@ -664,6 +658,7 @@ def _():
         )
 
         return logging.getLogger("cohort_creator")
+
     return (poia_logger,)
 
 
@@ -723,6 +718,7 @@ def plot_usage(Version, mcolors, plt, px):
         fig.update_layout(xaxis_title=col, yaxis_title="Usage Count")
 
         return fig
+
     return (plot_usage,)
 
 
@@ -771,6 +767,7 @@ def plot_repos(Version, mcolors, plt, px):
         fig.update_traces(xbins={"start": start_date, "end": end_date, "size": bin_size})
 
         return fig
+
     return (plot_repos,)
 
 
@@ -796,6 +793,7 @@ def _(Version, px):
         )
         fig.update_layout(xaxis_title="Version", yaxis_title="Repository Count")
         return fig
+
     return (plot_versions,)
 
 
@@ -857,6 +855,7 @@ def _(ast, warnings):
                         import_counts[submodule] = import_counts.get(submodule, 0) + 1
 
         return import_counts
+
     return (count_imports,)
 
 
@@ -924,6 +923,7 @@ def _(ast, count_imports, warnings):
         function_counts = {k: v for k, v in function_counts.items() if k not in imports}
 
         return function_counts
+
     return (count_functions,)
 
 
@@ -969,6 +969,7 @@ def _(logger, requests, time):
         time.sleep(config["GITHUB_API"]["SLEEP_TIME"])
 
         return response
+
     return (call_api,)
 
 
@@ -1027,6 +1028,7 @@ def _(Path, call_api, load_cache, logger, update_cache):
         logger.info("Done.")
 
         return list(repo_urls)
+
     return (search_repositories,)
 
 
@@ -1089,6 +1091,7 @@ def _(collections, logger, requests):
             logger.info(duplicates)
 
         return dependents
+
     return (get_dependents,)
 
 
@@ -1121,6 +1124,7 @@ def _(Path, config, logger, os, subprocess):
             logger.info(f"Cloned: {url}")
         except subprocess.CalledProcessError:
             logger.error(f"Failed to clone: {url}")
+
     return (clone_repo,)
 
 
@@ -1135,10 +1139,10 @@ def _update_cache(Path, json, load_cache, logger):
     def update_cache(cache_file: Path | None, data: list[str]):
         """Update data to a JSON cache file."""
         if not isinstance(cache_file, Path):
-            return 
+            return
         if cache_file is None:
             return
-        
+
         cache_file.parent.mkdir(exist_ok=True, parents=True)
         cache = load_cache(cache_file)
         cache.extend(data)
@@ -1149,6 +1153,7 @@ def _update_cache(Path, json, load_cache, logger):
                 logger.error("TypeError: unhashable type: 'dict'")
         with cache_file.open("w") as f:
             json.dump(cache, f, indent=2)
+
     return (update_cache,)
 
 
@@ -1164,6 +1169,7 @@ def _load_cache(Path, json, requests):
             if response.status_code == 200:
                 return response.json()
         return []
+
     return (load_cache,)
 
 
@@ -1300,6 +1306,7 @@ def _(pd):
                     }
                 )
         return pd.DataFrame(object_list)
+
     return (extract_object_count,)
 
 
@@ -1315,20 +1322,15 @@ def _(
     shutil,
 ):
     def extract_data(config):
-
-        content_cache_file = (
-            config["OUTPUT"]["DIR"] / config["OUTPUT"]["CONTENT"]
-        )
+        content_cache_file = config["OUTPUT"]["DIR"] / config["OUTPUT"]["CONTENT"]
 
         # nbconvert cannot be installed in WASM
         try:
-            from nbconvert import PythonExporter
+            from nbconvert import PythonExporter  # noqa : F401
         except ModuleNotFoundError:
             return content_cache_file
 
-        ignore_list = load_cache(
-            config["OUTPUT"]["DIR"] / config["OUTPUT"]["IGNORE"]
-        )
+        ignore_list = load_cache(config["OUTPUT"]["DIR"] / config["OUTPUT"]["IGNORE"])
 
         data_projects = load_cache(content_cache_file)
         repo_already_done = {x["name"] for x in data_projects}
@@ -1388,6 +1390,7 @@ def _(
         logger.info("Data extraction done.")
 
         return content_cache_file
+
     return (extract_data,)
 
 
@@ -1398,7 +1401,7 @@ def _(Path, count_functions, count_imports, find_files_with_string, logger):
 
     def extract_data_repo(repo_path: Path, config):
         from nbconvert import PythonExporter
-    
+
         exporter = PythonExporter()
 
         import_counts: dict[str, int] = {}
@@ -1507,6 +1510,7 @@ def _(Path, count_functions, count_imports, find_files_with_string, logger):
             "function_counts": function_counts,
             "contains_python_2": contains_python_2,
         }
+
     return (extract_data_repo,)
 
 
@@ -1539,12 +1543,13 @@ def _(logger, subprocess):
             else:
                 logger.error("An error occurred")
                 return []
+
     return (find_files_with_string,)
 
 
 @app.cell(disabled=True, hide_code=True)
 def test_extract_data_repo(config, extract_data_repo):
-    data_this_repo = repo_to_test = config["CACHE"]["DIR"] / "poldrack" / "myconnectome"
+    repo_to_test = config["CACHE"]["DIR"] / "poldrack" / "myconnectome"
     extract_data_repo(repo_path=repo_to_test, config=config)
     return
 
@@ -1575,6 +1580,7 @@ def _(Path, logger, subprocess):
         except subprocess.CalledProcessError as e:
             logger.error(f"Error: {e}")
             return None
+
     return (get_last_commit_date,)
 
 
@@ -1631,6 +1637,7 @@ def _(
                 )
 
         return versions
+
     return (get_version,)
 
 
@@ -1655,6 +1662,7 @@ def _(Path):
             return "several_lockfile_detected"
         else:
             return next(iter(set(tmp)))
+
     return (get_lock_file,)
 
 
@@ -1672,6 +1680,7 @@ def _(re):
             if match:
                 return match.group(1)
         return "0.0.0"
+
     return (extract_version,)
 
 
@@ -1722,6 +1731,7 @@ def _(Path, print):
         except Exception as e:
             print(f"Error reading pyproject.toml: {e}")
             return None
+
     return (get_version_from_pyproject,)
 
 
@@ -1758,6 +1768,7 @@ def _(configparser, print):
         except Exception as e:
             print(f"Error reading setup.cfg: {e}")
             return None
+
     return (get_version_from_setup_cfg,)
 
 
@@ -1793,6 +1804,7 @@ def _(Path, ast, logger):
             if config["PACKAGE_OF_INTEREST"] in dep:
                 return dep
         return None
+
     return (get_version_from_setup_py,)
 
 
@@ -1891,9 +1903,7 @@ def _(mo):
 
 @app.cell
 def _():
-    import argparse
     import ast
-    import base64
     import collections
     import configparser
     import itertools
@@ -1902,23 +1912,19 @@ def _():
     import re
     import shutil
     import subprocess
-    import sys
     import time
     import warnings
-    from ast import literal_eval
     from pathlib import Path
 
     import marimo as mo
-    import matplotlib as mpl
     import matplotlib.colors as mcolors
     import matplotlib.pyplot as plt
     import pandas as pd
     import plotly.express as px
     import requests
-    from marimo import md
-    from matplotlib import cm
     from packaging.version import Version
     from rich import print
+
     return (
         Path,
         Version,

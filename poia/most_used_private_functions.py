@@ -62,7 +62,7 @@ def _(importlib, inspect, mo, nilearn):
 
 @app.cell
 def _(mo, pd):
-    df = pd.read_csv(mo.notebook_location() / "public" / "nilearn" / "functions_used.csv")
+    df = pd.read_csv(mo.notebook_location() / "public" / "functions_used.csv")
     return (df,)
 
 

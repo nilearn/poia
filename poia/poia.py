@@ -20,7 +20,7 @@
 
 import marimo
 
-__generated_with = "0.12.8"
+__generated_with = "0.13.0"
 app = marimo.App(width="medium", app_title="POIA")
 
 
@@ -71,12 +71,11 @@ def _(config, mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     QUERIES,
     config,
     get_dependents,
-    json,
     load_cache,
     logger,
     search_repositories,
@@ -85,47 +84,50 @@ def _(
     dependents = None
 
     dependents_file = (
-        config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["DEPENDENTS"]
+        config["OUTPUT"]["DIR"] / config["OUTPUT"]["DEPENDENTS"]
     )
 
     repos = []
 
-    if dependents_file.exists() or config["PACKAGE_OF_INTEREST_REPO"]:
-        if dependents_file.exists():
-            logger.info(f"Loading dependents file: {dependents_file}")
-            with dependents_file.open("r") as f:
-                dependents = json.load(f)
-        elif config["PACKAGE_OF_INTEREST_REPO"]:
-            logger.info(f"Dependents file not found: {dependents_file}")
-            logger.info("Scrapping github for dependents...")
-            dependents = get_dependents(config["PACKAGE_OF_INTEREST_REPO"])
-            update_cache(dependents_file, dependents)
+    logger.info(f"Loading dependents file: {dependents_file}")
+    dependents = load_cache(dependents_file)
 
+    if not dependents and config["PACKAGE_OF_INTEREST_REPO"]:
+        logger.info(f"Dependents file not found: {dependents_file}")
+        logger.info("Scrapping github for dependents...")
+        dependents = get_dependents(config["PACKAGE_OF_INTEREST_REPO"])
+
+    if dependents:
+    
+        update_cache(dependents_file, dependents)
+    
         repos = [f"https://github.com/{x}" for x in dependents]
 
         repo_url_cache_file = (
             config["OUTPUT"]["DIR"]
-            / config["PACKAGE_OF_INTEREST"]
             / config["OUTPUT"]["REPOSITORIES"]
         )
-        if repo_url_cache_file.exists():
+        extra_repos = load_cache(repo_url_cache_file)
+        if extra_repos:
             logger.info("Adding repos grabbed from github API...")
-            repos.extend(load_cache(repo_url_cache_file))
+            repos.extend(extra_repos)
+        
         repos = list(set(repos))
 
     else:
         logger.info(f"'dependents' file not found: {dependents_file}")
         logger.info(f"No known repo for: {config['PACKAGE_OF_INTEREST']}")
-        logger.info("Pipping github API to list repos...")
+        logger.info("Pinging github API to list repos...")
+    
         repos = search_repositories(
             queries=QUERIES,
             config=config,
             cache_file=config["OUTPUT"]["REPOSITORIES"],
         )
-    return dependents, dependents_file, f, repo_url_cache_file, repos
+    return (repos,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Path, config, mo, repos, shutil):
     cloned_repos = set()
     for r in set(repos):
@@ -134,16 +136,17 @@ def _(Path, config, mo, repos, shutil):
         repo_name = url_path.name
         user_name = url_path.parents[0].name
 
-        if (config["CACHE"]["DIR"] / user_name / repo_name).exists():
-            if (config["CACHE"]["DIR"] / user_name / repo_name / ".git").exists():
-                cloned_repos.add(r)
-            else:
-                shutil.rmtree(r)
+        if isinstance(config["CACHE"]["DIR"], Path):
+            if (config["CACHE"]["DIR"] / user_name / repo_name).exists():
+                if (config["CACHE"]["DIR"] / user_name / repo_name / ".git").exists():
+                    cloned_repos.add(r)
+                else:
+                    shutil.rmtree(r)
 
-        if (config["CACHE"]["DIR"] / user_name).exists() and not list(
-            (config["CACHE"]["DIR"] / user_name).iterdir()
-        ):
-            shutil.rmtree(config["CACHE"]["DIR"] / user_name)
+            if (config["CACHE"]["DIR"] / user_name).exists() and not list(
+                (config["CACHE"]["DIR"] / user_name).iterdir()
+            ):
+                shutil.rmtree(config["CACHE"]["DIR"] / user_name)
 
     mo.md(
         f"""
@@ -152,7 +155,7 @@ def _(Path, config, mo, repos, shutil):
         {len(cloned_repos)} repositories already cloned.
         """
     )
-    return cloned_repos, r, repo_name, url_path, user_name
+    return
 
 
 @app.cell
@@ -177,7 +180,7 @@ def clone_repositories(clone_repo, config, load_cache, logger, repos):
     with ThreadPoolExecutor(max_workers=config["N_JOBS"]) as executor:
         executor.map(clone_repo, [x for x in repos if x not in ignore_list])
     logger.info("Cloning done.")
-    return ThreadPoolExecutor, executor, ignore_list
+    return
 
 
 @app.cell(hide_code=True)
@@ -198,71 +201,40 @@ def _(config, extract_data):
     return (content_cache_file,)
 
 
-@app.cell
-def _(
-    config,
-    content_cache_file,
-    get_extracted_version,
-    get_lock_file,
-    literal_eval,
-    load_cache,
-    logger,
-    mo,
-    pd,
-):
-    data_cache_file = mo.notebook_location() / config["OUTPUT"]["DATA"]
+@app.cell(hide_code=True)
+def _(config, content_cache_file, get_lock_file, load_cache, mo, pd):
+    data_projects = load_cache(content_cache_file)
 
-    try:
-        data_poi = pd.read_csv(
-            data_cache_file,
-            na_values="n/a",
-            converters={
-                "versions": literal_eval,
-            },
-            parse_dates=["last_commit"],
-        )
+    data_poi = pd.DataFrame(data_projects)
 
-        logger.info(f"File {data_cache_file} loaded.")
+    data_poi["last_commit"] = pd.to_datetime(data_poi["last_commit"])
 
-    except Exception as e:
-        logger.error(repr(e))
-        logger.error(f"Could not load {data_cache_file}")
-        logger.error(f"Trying to create dataframe from {content_cache_file}")
+    data_poi["extracted_version"] = data_poi["versions"].apply(get_extracted_version)
+    data_poi["lockfile"] = data_poi["versions"].apply(get_lock_file)
 
-        data_projects = load_cache(content_cache_file)
+    data_poi["has_version"] = data_poi["extracted_version"].astype("bool", errors="ignore")
+    data_poi["has_imports"] = data_poi["import_counts"].astype("bool", errors="ignore")
+    data_poi["use_imports"] = data_poi["function_counts"].astype("bool", errors="ignore")
+    data_poi["include"] = (
+        data_poi["has_version"] | data_poi["has_imports"] | data_poi["use_imports"]
+    )
 
-        data_poi = pd.DataFrame(data_projects)
+    data_poi[["user", "repo"]] = data_poi["name"].str.split("/", expand=True)
 
-        data_poi["last_commit"] = pd.to_datetime(data_poi["last_commit"])
+    data_poi["content"] = "mixed"
+    pure_notebook = (data_poi["n_notebook_parsed"] > 0) & (
+        data_poi["n_python_file_parsed"] == 0
+    )
+    pure_python = (data_poi["n_notebook_parsed"] == 0) & (data_poi["n_python_file_parsed"] > 0)
+    data_poi.loc[pure_notebook, "content"] = "notebook"
+    data_poi.loc[pure_python, "content"] = "python"
 
-        data_poi["extracted_version"] = data_poi["versions"].apply(get_extracted_version)
-        data_poi["lockfile"] = data_poi["versions"].apply(get_lock_file)
+    data_poi["p_notebook_parsed"] = data_poi["n_notebook_parsed"] / (data_poi["n_notebook"])
+    data_poi["p_python_file_parsed"] = (
+        data_poi["n_python_file_parsed"] / (data_poi["n_python_file"])
+    )
 
-        data_poi["has_version"] = data_poi["extracted_version"].astype("bool", errors="ignore")
-        data_poi["has_imports"] = data_poi["import_counts"].astype("bool", errors="ignore")
-        data_poi["use_imports"] = data_poi["function_counts"].astype("bool", errors="ignore")
-        data_poi["include"] = (
-            data_poi["has_version"] | data_poi["has_imports"] | data_poi["use_imports"]
-        )
-
-        data_poi[["user", "repo"]] = data_poi["name"].str.split("/", expand=True)
-
-        data_poi["content"] = "mixed"
-        pure_notebook = (data_poi["n_notebook_parsed"] > 0) & (
-            data_poi["n_python_file_parsed"] == 0
-        )
-        pure_python = (data_poi["n_notebook_parsed"] == 0) & (data_poi["n_python_file_parsed"] > 0)
-        data_poi.loc[pure_notebook, "content"] = "notebook"
-        data_poi.loc[pure_python, "content"] = "python"
-
-        data_poi["p_notebook_parsed"] = data_poi["n_notebook_parsed"] / (data_poi["n_notebook"])
-        data_poi["p_python_file_parsed"] = (
-            data_poi["n_python_file_parsed"] / (data_poi["n_python_file"])
-        )
-
-        data_poi["duplicated_repo"] = data_poi["repo"].duplicated()
-
-        data_poi.fillna("n/a").to_csv(data_cache_file, index=False)
+    data_poi["duplicated_repo"] = data_poi["repo"].duplicated()
 
     mo.md(
         f"""
@@ -285,7 +257,7 @@ def _(
           only python files, jupyter notebook or both.
         """
     )
-    return data_cache_file, data_poi, data_projects, pure_notebook, pure_python
+    return (data_poi,)
 
 
 @app.cell(hide_code=True)
@@ -316,7 +288,7 @@ def _(data_poi):
 def _(data_poi, mo):
     transformed_df = mo.ui.dataframe(data_poi)
     transformed_df
-    return (transformed_df,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -345,7 +317,7 @@ def _(config, data_poi, mo, px):
     using {config["PACKAGE_OF_INTEREST"]}
     in notebooks, python files or both.
     """)
-    return (fig_content,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -386,7 +358,7 @@ def _(config, data_poi, mo, plt):
         but could not be properly parsed.
         """
     )
-    return actually_import, actually_mentions, as_dependency, venn3
+    return
 
 
 @app.cell(hide_code=True)
@@ -432,7 +404,7 @@ def _(
             plot,
         ]
     )
-    return interactive_plot, plot
+    return (plot,)
 
 
 @app.cell
@@ -445,7 +417,7 @@ def _(plot):
 def _(data_poi):
     never_imported = data_poi[(data_poi["has_version"]) & (~data_poi["use_imports"])]
     never_imported
-    return (never_imported,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -482,7 +454,7 @@ def _(config, data_poi, mo, px, radio_include, radio_include_element):
             ),
         ]
     )
-    return fig_lockfile, plot_lockfiles
+    return
 
 
 @app.cell(hide_code=True)
@@ -525,7 +497,7 @@ def _(
             ),
         ]
     )
-    return (fig_repo,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -536,7 +508,7 @@ def version_used(data_poi, mo, plot_versions):
     mo.md("""
     ### Version used
     """)
-    return (fig_version,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -557,7 +529,7 @@ def _(import_df):
     import_df_counts = import_df["object"].value_counts().reset_index()
     import_df_counts.columns = ["object", "count"]
     import_df_counts
-    return (import_df_counts,)
+    return
 
 
 @app.cell
@@ -567,7 +539,7 @@ def _(import_df):
     )
     import_df_weighted.columns = ["object", "weighted_count"]
     import_df_weighted
-    return (import_df_weighted,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -598,7 +570,7 @@ def _(
             ),
         ],
     )
-    return (subpackage_fig,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -611,7 +583,7 @@ def _(mo):
 def _(config, data_poi, extract_object_count):
     function_df = extract_object_count(data_poi[data_poi["use_imports"]], col="function_counts", config=config)
     function_df.to_csv(
-        config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / "functions_used.csv", index=False
+        config["OUTPUT"]["DIR"] / "functions_used.csv", index=False
     )
     function_df
     return (function_df,)
@@ -622,7 +594,7 @@ def _(function_df):
     function_df_counts = function_df["object"].value_counts().reset_index()
     function_df_counts.columns = ["object", "count"]
     function_df_counts
-    return (function_df_counts,)
+    return
 
 
 @app.cell
@@ -632,7 +604,7 @@ def _(function_df):
     )
     function_df_weighted.columns = ["object", "weighted_count"]
     function_df_weighted
-    return (function_df_weighted,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -660,7 +632,7 @@ def _(
             ),
         ]
     )
-    return (function_fig,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -675,7 +647,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import logging
 
@@ -692,7 +664,7 @@ def _():
         )
 
         return logging.getLogger("cohort_creator")
-    return RichHandler, logging, poia_logger
+    return (poia_logger,)
 
 
 @app.cell(hide_code=True)
@@ -895,7 +867,7 @@ def test_count_imports(config, count_imports, dummy_file):
     assert actual_count_imports == expected_count_imports, (
         f"{actual_count_imports=} {expected_count_imports=}"
     )
-    return actual_count_imports, expected_count_imports
+    return
 
 
 @app.cell(hide_code=True)
@@ -962,7 +934,7 @@ def test_count_functions(config, count_functions, dummy_file):
     assert actual_count_functions == expected_count_functions, (
         f"{actual_count_functions=} {expected_count_functions=}"
     )
-    return actual_count_functions, expected_count_functions
+    return
 
 
 @app.cell(hide_code=True)
@@ -997,7 +969,7 @@ def _(logger, requests, time):
         time.sleep(config["GITHUB_API"]["SLEEP_TIME"])
 
         return response
-    return call_api, quote
+    return (call_api,)
 
 
 @app.cell(hide_code=True)
@@ -1007,7 +979,7 @@ def _(Path, call_api, load_cache, logger, update_cache):
 
         Save responses and list of repos.
         """
-        repo_url_cache_file = config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / cache_file
+        repo_url_cache_file = config["OUTPUT"]["DIR"] / cache_file
 
         if cache_file and not config["CACHE"]["REFRESH"]:
             if repo_url_cache_file.exists():
@@ -1077,7 +1049,10 @@ def _(collections, logger, requests):
 
                 r = requests.get(url)
 
-                soup = BeautifulSoup(r.content, "html.parser")
+                try:
+                    soup = BeautifulSoup(r.content, "html.parser")
+                except TypeError:
+                    break
 
                 for t in soup.find_all("div", {"class": "Box-row"}):
                     user = t.find("a", {"data-hovercard-type": "user"})
@@ -1114,7 +1089,7 @@ def _(collections, logger, requests):
             logger.info(duplicates)
 
         return dependents
-    return BeautifulSoup, get_dependents
+    return (get_dependents,)
 
 
 @app.cell(hide_code=True)
@@ -1159,8 +1134,11 @@ def _(mo):
 def _update_cache(Path, json, load_cache, logger):
     def update_cache(cache_file: Path | None, data: list[str]):
         """Update data to a JSON cache file."""
+        if not isinstance(cache_file, Path):
+            return 
         if cache_file is None:
             return
+        
         cache_file.parent.mkdir(exist_ok=True, parents=True)
         cache = load_cache(cache_file)
         cache.extend(data)
@@ -1175,12 +1153,16 @@ def _update_cache(Path, json, load_cache, logger):
 
 
 @app.cell(hide_code=True)
-def _load_cache(Path, json):
+def _load_cache(Path, json, requests):
     def load_cache(cache_file: Path):
         """Load data from a JSON cache file if it exists."""
-        if cache_file.exists():
+        if isinstance(cache_file, Path) and cache_file.exists():
             with cache_file.open("r") as f:
                 return json.load(f)
+        else:
+            response = requests.get(cache_file)
+            if response.status_code == 200:
+                return response.json()
         return []
     return (load_cache,)
 
@@ -1321,7 +1303,7 @@ def _(pd):
     return (extract_object_count,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     extract_data_repo,
     get_last_commit_date,
@@ -1333,12 +1315,19 @@ def _(
     shutil,
 ):
     def extract_data(config):
-        ignore_list = load_cache(
-            config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["IGNORE"]
-        )
 
         content_cache_file = (
-            config["OUTPUT"]["DIR"] / config["PACKAGE_OF_INTEREST"] / config["OUTPUT"]["CONTENT"]
+            config["OUTPUT"]["DIR"] / config["OUTPUT"]["CONTENT"]
+        )
+
+        # nbconvert cannot be installed in WASM
+        try:
+            from nbconvert import PythonExporter
+        except ModuleNotFoundError:
+            return content_cache_file
+
+        ignore_list = load_cache(
+            config["OUTPUT"]["DIR"] / config["OUTPUT"]["IGNORE"]
         )
 
         data_projects = load_cache(content_cache_file)
@@ -1402,13 +1391,14 @@ def _(
     return (extract_data,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Path, count_functions, count_imports, find_files_with_string, logger):
     import nbformat
-    from nbconvert import PythonExporter
     from nbformat.reader import NotJSONError
 
     def extract_data_repo(repo_path: Path, config):
+        from nbconvert import PythonExporter
+    
         exporter = PythonExporter()
 
         import_counts: dict[str, int] = {}
@@ -1517,7 +1507,7 @@ def _(Path, count_functions, count_imports, find_files_with_string, logger):
             "function_counts": function_counts,
             "contains_python_2": contains_python_2,
         }
-    return NotJSONError, PythonExporter, extract_data_repo, nbformat
+    return (extract_data_repo,)
 
 
 @app.cell(hide_code=True)
@@ -1556,7 +1546,7 @@ def _(logger, subprocess):
 def test_extract_data_repo(config, extract_data_repo):
     data_this_repo = repo_to_test = config["CACHE"]["DIR"] / "poldrack" / "myconnectome"
     extract_data_repo(repo_path=repo_to_test, config=config)
-    return data_this_repo, repo_to_test
+    return
 
 
 @app.cell(hide_code=True)
@@ -1594,7 +1584,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(
     Path,
     extract_version,
@@ -1644,20 +1634,18 @@ def _(
     return (get_version,)
 
 
-@app.cell
-def get_extracted_version():
-    def get_extracted_version(version_list):
-        tmp = [x["extracted_version"] for x in version_list if x["extracted_version"] is not None]
-        if not tmp:
-            return None
-        elif len(set(tmp)) > 1:
-            return "several_versions_detected"
-        else:
-            return next(iter(set(tmp)))
-    return (get_extracted_version,)
+@app.function(hide_code=True)
+def get_extracted_version(version_list):
+    tmp = [x["extracted_version"] for x in version_list if x["extracted_version"] is not None]
+    if not tmp:
+        return None
+    elif len(set(tmp)) > 1:
+        return "several_versions_detected"
+    else:
+        return next(iter(set(tmp)))
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Path):
     def get_lock_file(version_list):
         tmp = [Path(x["file"]).name for x in version_list if x["extracted_version"] is not None]
@@ -1734,7 +1722,7 @@ def _(Path, print):
         except Exception as e:
             print(f"Error reading pyproject.toml: {e}")
             return None
-    return get_version_from_pyproject, toml
+    return (get_version_from_pyproject,)
 
 
 @app.cell(hide_code=True)
@@ -1773,7 +1761,7 @@ def _(configparser, print):
     return (get_version_from_setup_cfg,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(Path, ast, logger):
     def get_version_from_setup_py(setup_py: Path, config) -> str | None:
         with setup_py.open("r") as f:
@@ -1820,7 +1808,7 @@ def _set_config(GITHUB_TOKEN, Path, mo):
         "PACKAGE_OF_INTEREST": "nilearn",
         "PACKAGE_OF_INTEREST_REPO": "nilearn/nilearn",
         "OUTPUT": {
-            "DIR": mo.notebook_dir() / "public",
+            "DIR": mo.notebook_location() / "public",
             "DEPENDENTS": "dependents.json",  # repositories found by github-dependents-info
             "REPOSITORIES": "repositories.json",  # repositories to investigate
             "CONTENT": "content.json",  # content found
@@ -1828,7 +1816,7 @@ def _set_config(GITHUB_TOKEN, Path, mo):
             "IGNORE": "ignore.json",  # repositories to ignore
         },
         "CACHE": {
-            "DIR": mo.notebook_dir() / "tmp",
+            "DIR": mo.notebook_location() / "tmp",
             "REFRESH": False,
         },
         "LOCKFILES": [
@@ -1934,19 +1922,13 @@ def _():
     return (
         Path,
         Version,
-        argparse,
         ast,
-        base64,
-        cm,
         collections,
         configparser,
         itertools,
         json,
-        literal_eval,
         mcolors,
-        md,
         mo,
-        mpl,
         os,
         pd,
         plt,
@@ -1956,7 +1938,6 @@ def _():
         requests,
         shutil,
         subprocess,
-        sys,
         time,
         warnings,
     )

@@ -36,7 +36,7 @@ jobs:
                 marimo export html-wasm --mode edit poia/poia.py -o _site/notebooks/poia.html
 
         -   name: 📤 Upload artifact
-            uses: actions/upload-pages-artifact@v3
+            uses: actions/upload-pages-artifact@v4
             with:
                 path: _site
 
